@@ -2,6 +2,32 @@ import React from "react";
 import { Box, Text } from "ink";
 import { MASCOT_LINES } from "../services/help.js";
 
+const SHADOW_CHARS = "╔╗╚╝═║";
+
+function MascotLine({ line }: { line: string }) {
+  // Split line into segments of consecutive same-type characters (block vs shadow)
+  const segments: { text: string; shadow: boolean }[] = [];
+  for (const ch of line) {
+    const isShadow = SHADOW_CHARS.includes(ch);
+    const isSpace = ch === " ";
+    const last = segments[segments.length - 1];
+    if (isSpace && last) {
+      last.text += ch;
+    } else if (last && last.shadow === isShadow) {
+      last.text += ch;
+    } else {
+      segments.push({ text: ch, shadow: isShadow });
+    }
+  }
+  return (
+    <Text>
+      {segments.map((seg, j) => (
+        <Text key={j} color={seg.shadow ? "#585b70" : "#89b4fa"}>{seg.text}</Text>
+      ))}
+    </Text>
+  );
+}
+
 export function Header({ view, showMascot }: { view: string; showMascot?: boolean }) {
   return (
     <Box flexDirection="column">
@@ -9,7 +35,7 @@ export function Header({ view, showMascot }: { view: string; showMascot?: boolea
         <Box flexDirection="row" marginBottom={1}>
           <Box flexDirection="column" marginRight={2}>
             {MASCOT_LINES.map((line, i) => (
-              <Text key={i} color="#89b4fa">{line}</Text>
+              <MascotLine key={i} line={line} />
             ))}
           </Box>
           <Box flexDirection="column" justifyContent="center">
