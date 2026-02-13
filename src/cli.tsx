@@ -10,6 +10,7 @@ const cli = meow(
     $ ch                    Open TUI dashboard
     $ ch add <name>         Add new account
     $ ch remove <name>      Remove account
+    $ ch rotate-token <name> Rotate account token
     $ ch daemon start       Start hub daemon
     $ ch daemon stop        Stop hub daemon
     $ ch bridge --account   MCP bridge (internal)
@@ -78,6 +79,21 @@ if (command === "daemon" && subcommand === "start") {
   try {
     await teardownAccount(name, { purge: cli.flags.purge });
     console.log(`Account '${name}' removed.${cli.flags.purge ? " Config directory purged." : ""}`);
+  } catch (e: any) {
+    console.error(`Error: ${e.message}`);
+    process.exit(1);
+  }
+} else if (command === "rotate-token") {
+  const name = subcommand;
+  if (!name) {
+    console.error("Usage: ch rotate-token <name>");
+    process.exit(1);
+  }
+  const { rotateToken } = await import("./services/account-manager.js");
+  try {
+    const { tokenPath } = await rotateToken(name);
+    console.log(`Token rotated for account '${name}'.`);
+    console.log(`  New token: ${tokenPath}`);
   } catch (e: any) {
     console.error(`Error: ${e.message}`);
     process.exit(1);

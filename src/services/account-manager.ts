@@ -115,6 +115,30 @@ async function setupMCPConfig(configDir: string, accountName: string): Promise<v
   await writeFile(settingsPath, JSON.stringify(settings, null, 2));
 }
 
+export async function rotateToken(
+  name: string,
+  opts?: { configPath?: string }
+): Promise<{ newToken: string; tokenPath: string }> {
+  const config = await loadConfig(opts?.configPath);
+  const account = config.accounts.find((a) => a.name === name);
+  if (!account) {
+    throw new Error(`Account '${name}' not found`);
+  }
+
+  // Generate new token
+  const newToken = generateToken();
+  const tokensDir = getTokensDir();
+  await mkdir(tokensDir, { recursive: true });
+  const tokenPath = join(tokensDir, `${name}.token`);
+  await writeFile(tokenPath, newToken, { mode: 0o600 });
+
+  // Update settings.json MCP config in account's config dir
+  const expandedDir = account.configDir.replace(/^~/, process.env.HOME ?? "");
+  await setupMCPConfig(expandedDir, name);
+
+  return { newToken, tokenPath };
+}
+
 export async function teardownAccount(
   name: string,
   opts?: { purge?: boolean; configPath?: string }
