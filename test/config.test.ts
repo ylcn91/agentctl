@@ -90,6 +90,27 @@ describe("removeAccount", () => {
   });
 });
 
+describe("saveConfig + loadConfig roundtrip", () => {
+  test("saves and reloads config correctly", async () => {
+    const config = await loadConfig(TEST_CONFIG);
+    const updated = addAccount(config, {
+      name: "roundtrip",
+      configDir: "~/.claude-roundtrip",
+      color: "#a6e3a1",
+      label: "Roundtrip",
+      provider: "claude-code",
+    });
+    await saveConfig(updated, TEST_CONFIG);
+
+    const reloaded = await loadConfig(TEST_CONFIG);
+    expect(reloaded.accounts).toHaveLength(1);
+    expect(reloaded.accounts[0].name).toBe("roundtrip");
+    expect(reloaded.accounts[0].color).toBe("#a6e3a1");
+    expect(reloaded.schemaVersion).toBe(1);
+    expect(reloaded.defaults.quotaPolicy.plan).toBe("max-5x");
+  });
+});
+
 describe("migrateConfig", () => {
   test("v1 config needs no migration", async () => {
     writeFileSync(TEST_CONFIG, JSON.stringify({ schemaVersion: 1, accounts: [], entire: { autoEnable: true }, defaults: { launchInNewWindow: true, quotaPolicy: { plan: "max-5x", windowMs: 18000000, estimatedLimit: 225, source: "community-estimate" } } }));
