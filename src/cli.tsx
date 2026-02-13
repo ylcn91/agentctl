@@ -14,6 +14,7 @@ const cli = meow(
     $ ch daemon stop        Stop hub daemon
     $ ch bridge --account   MCP bridge (internal)
     $ ch status             Show account status
+    $ ch usage              Show usage table
     $ ch list               List accounts
 
   Options
@@ -85,11 +86,14 @@ if (command === "daemon" && subcommand === "start") {
   // MCP bridge - will be connected when mcp/bridge.ts exists
   console.log(`Bridge mode for account: ${cli.flags.account} (not yet implemented)`);
 } else if (command === "status") {
-  // Quick status - will be implemented in Task 13
-  console.log("Status command not yet implemented. Use TUI: ch");
+  const { statusCommand } = await import("./services/cli-commands.js");
+  console.log(await statusCommand());
+} else if (command === "usage") {
+  const { usageCommand } = await import("./services/cli-commands.js");
+  console.log(await usageCommand());
 } else if (command === "list") {
-  // List accounts - will be implemented in Task 13
-  console.log("List command not yet implemented. Use TUI: ch");
+  const { listCommand } = await import("./services/cli-commands.js");
+  console.log(await listCommand());
 } else {
   // Default: TUI mode
   render(<App />);
