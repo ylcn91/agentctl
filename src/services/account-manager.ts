@@ -1,0 +1,177 @@
+import { mkdir, symlink, readlink, unlink, readdir, chmod, writeFile, readFile, copyFile } from "node:fs/promises";
+import { existsSync } from "fs";
+import { join, dirname } from "path";
+import { randomBytes } from "crypto";
+import { loadConfig, saveConfig, addAccount, removeAccount } from "../config";
+import { TOKENS_DIR } from "../types";
+import type { AccountConfig } from "../types";
+
+export const CATPPUCCIN_COLORS = [
+  { name: "Mauve", hex: "#cba6f7" },
+  { name: "Blue", hex: "#89b4fa" },
+  { name: "Sapphire", hex: "#74c7ec" },
+  { name: "Teal", hex: "#94e2d5" },
+  { name: "Green", hex: "#a6e3a1" },
+  { name: "Yellow", hex: "#f9e2af" },
+  { name: "Peach", hex: "#fab387" },
+  { name: "Red", hex: "#f38ba8" },
+  { name: "Pink", hex: "#f5c2e7" },
+  { name: "Flamingo", hex: "#f2cdcd" },
+  { name: "Rosewater", hex: "#f5e0dc" },
+  { name: "Lavender", hex: "#b4befe" },
+] as const;
+
+export interface SetupAccountOptions {
+  name: string;
+  configDir: string;
+  color: string;
+  label: string;
+  symlinkPlugins?: boolean;
+  symlinkSkills?: boolean;
+  symlinkCommands?: boolean;
+  addShellAlias?: boolean;
+  configPath?: string;
+}
+
+function getTokensDir(): string {
+  return process.env.CLAUDE_HUB_DIR
+    ? `${process.env.CLAUDE_HUB_DIR}/tokens`
+    : TOKENS_DIR;
+}
+
+export function generateToken(): string {
+  return randomBytes(32).toString("hex");
+}
+
+export async function setupAccount(opts: SetupAccountOptions): Promise<{
+  account: AccountConfig;
+  tokenPath: string;
+}> {
+  const expandedDir = opts.configDir.replace(/^~/, process.env.HOME ?? "");
+
+  // 1. Create config directory
+  await mkdir(expandedDir, { recursive: true });
+
+  // 2. Generate token
+  const tokensDir = getTokensDir();
+  await mkdir(tokensDir, { recursive: true });
+  const token = generateToken();
+  const tokenPath = join(tokensDir, `${opts.name}.token`);
+  await writeFile(tokenPath, token, { mode: 0o600 });
+
+  // 3. Symlink plugins/skills/commands from ~/.claude
+  const defaultClaudeDir = `${process.env.HOME}/.claude`;
+  const symlinks: Array<[string, string]> = [];
+
+  if (opts.symlinkPlugins !== false) symlinks.push(["plugins", "plugins"]);
+  if (opts.symlinkSkills !== false) symlinks.push(["skills", "skills"]);
+  if (opts.symlinkCommands !== false) symlinks.push(["commands", "commands"]);
+
+  for (const [srcName, destName] of symlinks) {
+    const src = join(defaultClaudeDir, srcName);
+    const dest = join(expandedDir, destName);
+    if (existsSync(src) && !existsSync(dest)) {
+      await symlink(src, dest);
+    }
+  }
+
+  // 4. Add MCP config to settings.json
+  await setupMCPConfig(expandedDir, opts.name);
+
+  // 5. Add to hub config
+  const account: AccountConfig = {
+    name: opts.name,
+    configDir: opts.configDir,
+    color: opts.color,
+    label: opts.label,
+    provider: "claude-code",
+  };
+
+  const config = await loadConfig(opts.configPath);
+  const updated = addAccount(config, account);
+  await saveConfig(updated, opts.configPath);
+
+  return { account, tokenPath };
+}
+
+async function setupMCPConfig(configDir: string, accountName: string): Promise<void> {
+  const settingsPath = join(configDir, "settings.json");
+  let settings: Record<string, any> = {};
+
+  if (existsSync(settingsPath)) {
+    try {
+      const text = await readFile(settingsPath, "utf-8");
+      settings = JSON.parse(text);
+    } catch {}
+  }
+
+  if (!settings.mcpServers) settings.mcpServers = {};
+  settings.mcpServers["claude-hub"] = {
+    command: "ch",
+    args: ["bridge", "--account", accountName],
+  };
+
+  await mkdir(dirname(settingsPath), { recursive: true });
+  await writeFile(settingsPath, JSON.stringify(settings, null, 2));
+}
+
+export async function teardownAccount(
+  name: string,
+  opts?: { purge?: boolean; configPath?: string }
+): Promise<void> {
+  const config = await loadConfig(opts?.configPath);
+  const account = config.accounts.find((a) => a.name === name);
+  if (!account) {
+    throw new Error(`Account '${name}' not found`);
+  }
+
+  // Remove token
+  const tokensDir = getTokensDir();
+  const tokenPath = join(tokensDir, `${name}.token`);
+  if (existsSync(tokenPath)) {
+    await unlink(tokenPath);
+  }
+
+  // Purge: remove the config directory
+  if (opts?.purge) {
+    const expandedDir = account.configDir.replace(/^~/, process.env.HOME ?? "");
+    if (existsSync(expandedDir)) {
+      const { rm } = await import("node:fs/promises");
+      await rm(expandedDir, { recursive: true, force: true });
+    }
+  }
+
+  // Remove from config
+  const updated = removeAccount(config, name);
+  await saveConfig(updated, opts?.configPath);
+}
+
+export async function addShellAlias(
+  name: string,
+  configDir: string
+): Promise<{ modified: boolean; backupPath: string | null }> {
+  const zshrcPath = `${process.env.HOME}/.zshrc`;
+  const aliasLine = `alias claude-${name}='CLAUDE_CONFIG_DIR="${configDir}" claude'`;
+  const marker = `# claude-hub:${name}`;
+
+  let content = "";
+  if (existsSync(zshrcPath)) {
+    content = await readFile(zshrcPath, "utf-8");
+  }
+
+  // Idempotent: don't add if already present
+  if (content.includes(marker)) {
+    return { modified: false, backupPath: null };
+  }
+
+  // Backup before modifying
+  const backupPath = `${zshrcPath}.backup.${Date.now()}`;
+  if (existsSync(zshrcPath)) {
+    await copyFile(zshrcPath, backupPath);
+  }
+
+  const addition = `\n${marker}\n${aliasLine}\n`;
+  await writeFile(zshrcPath, content + addition);
+
+  return { modified: true, backupPath: existsSync(backupPath) ? backupPath : null };
+}
