@@ -60,12 +60,24 @@ export interface AgentStats {
   modelUsage: Record<string, { inputTokens: number; outputTokens: number }>;
 }
 
+// --- Process detection ---
+
+export interface ProcessInfo {
+  pid: number;
+  configDir: string;
+  startedAt?: string;
+}
+
 // --- Provider interface ---
 
 export interface AgentProvider {
   id: string;
   displayName: string;
+  icon: string;
   supportsEntire: boolean;
+
+  // Process detection
+  detectRunning(account: Account): Promise<ProcessInfo | null>;
 
   // Lifecycle
   buildLaunchCommand(account: Account, opts: LaunchOpts): string[];

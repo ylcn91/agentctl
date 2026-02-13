@@ -1,5 +1,6 @@
 import { connect } from "net";
 import { readFileSync, existsSync } from "fs";
+import { createLineParser, generateRequestId, frameSend } from "../daemon/framing";
 
 function getHubDir(): string {
   return process.env.CLAUDE_HUB_DIR ?? `${process.env.HOME}/.claude-hub`;
@@ -41,25 +42,41 @@ export async function fetchUnreadMessages(account: string): Promise<DaemonMessag
       resolve([]);
     }, 2000);
 
+    const pending = new Map<string, { resolve: Function }>();
+
     const socket = connect(sockPath, () => {
-      socket.write(JSON.stringify({ type: "auth", account, token }) + "\n");
+      const authId = generateRequestId();
+      pending.set(authId, {
+        resolve: (msg: any) => {
+          if (msg.type === "auth_ok") {
+            const readId = generateRequestId();
+            pending.set(readId, {
+              resolve: (readMsg: any) => {
+                clearTimeout(timeout);
+                socket.end();
+                resolve(readMsg.messages ?? []);
+              },
+            });
+            socket.write(frameSend({ type: "read_messages", requestId: readId }));
+          } else {
+            clearTimeout(timeout);
+            socket.end();
+            resolve([]);
+          }
+        },
+      });
+      socket.write(frameSend({ type: "auth", account, token, requestId: authId }));
     });
 
-    let step: "auth" | "read" = "auth";
-
-    socket.on("data", (data) => {
-      try {
-        const msg = JSON.parse(data.toString());
-        if (step === "auth" && msg.type === "auth_ok") {
-          step = "read";
-          socket.write(JSON.stringify({ type: "read_messages" }) + "\n");
-        } else if (step === "read" && msg.type === "result") {
-          clearTimeout(timeout);
-          socket.end();
-          resolve(msg.messages ?? []);
-        }
-      } catch {}
+    const parser = createLineParser((msg) => {
+      if (msg.requestId && pending.has(msg.requestId)) {
+        const entry = pending.get(msg.requestId)!;
+        pending.delete(msg.requestId);
+        entry.resolve(msg);
+      }
     });
+
+    socket.on("data", (data) => parser.feed(data));
 
     socket.on("error", () => {
       clearTimeout(timeout);

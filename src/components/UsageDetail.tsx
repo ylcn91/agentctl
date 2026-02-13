@@ -1,48 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { UsageBar } from "./UsageBar.js";
-import { ClaudeCodeProvider } from "../providers/claude-code.js";
-import { loadConfig } from "../config.js";
-import type { AccountConfig } from "../types.js";
-import type { AgentStats } from "../providers/types.js";
-
-const provider = new ClaudeCodeProvider();
-
-interface AccountUsage {
-  account: AccountConfig;
-  stats: AgentStats;
-  weeklyTotal: number;
-}
+import { loadUsageData, type AccountUsageData } from "../application/use-cases/load-usage-data.js";
 
 interface Props {
   onNavigate: (view: string) => void;
 }
 
 export function UsageDetail({ onNavigate }: Props) {
-  const [accounts, setAccounts] = useState<AccountUsage[]>([]);
+  const [accounts, setAccounts] = useState<AccountUsageData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAccount, setSelectedAccount] = useState(0);
 
   useEffect(() => {
-    async function load() {
-      const config = await loadConfig();
-      const data: AccountUsage[] = [];
-
-      for (const account of config.accounts) {
-        const configDir = account.configDir.replace("~", process.env.HOME!);
-        const statsPath = `${configDir}/stats-cache.json`;
-        const stats = await provider.parseStatsFromFile(statsPath);
-        const weeklyTotal = stats.weeklyActivity.reduce(
-          (sum, d) => sum + d.messageCount,
-          0
-        );
-        data.push({ account, stats, weeklyTotal });
-      }
-
+    loadUsageData().then((data) => {
       setAccounts(data);
       setLoading(false);
-    }
-    load();
+    });
   }, []);
 
   useInput((input, key) => {
@@ -131,8 +105,8 @@ export function UsageDetail({ onNavigate }: Props) {
                   <Box width={6}>
                     <Text>{dayName}</Text>
                   </Box>
-                  <Text color="cyan">{"█".repeat(barWidth)}</Text>
-                  <Text color="gray">{"░".repeat(15 - barWidth)}</Text>
+                  <Text color="cyan">{"\u2588".repeat(barWidth)}</Text>
+                  <Text color="gray">{"\u2591".repeat(15 - barWidth)}</Text>
                   <Text> {count}</Text>
                 </Box>
               );
@@ -155,8 +129,8 @@ export function UsageDetail({ onNavigate }: Props) {
                       <Box width={16}>
                         <Text>{shortName}</Text>
                       </Box>
-                      <Text color="magenta">{"█".repeat(barWidth)}</Text>
-                      <Text color="gray">{"░".repeat(15 - barWidth)}</Text>
+                      <Text color="magenta">{"\u2588".repeat(barWidth)}</Text>
+                      <Text color="gray">{"\u2591".repeat(15 - barWidth)}</Text>
                       <Text> {pct}%</Text>
                     </Box>
                   );

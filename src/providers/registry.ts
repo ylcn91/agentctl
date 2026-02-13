@@ -18,6 +18,10 @@ export class ProviderRegistry {
     return this.providers.get(id);
   }
 
+  getOrDefault(id: string): AgentProvider {
+    return this.providers.get(id) ?? this.providers.get("claude-code")!;
+  }
+
   listIds(): string[] {
     return Array.from(this.providers.keys());
   }

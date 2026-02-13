@@ -5,12 +5,15 @@ export interface QuotaPolicyConfig {
   source: "community-estimate" | "custom";
 }
 
+export const PROVIDER_IDS = ["claude-code", "codex-cli", "openhands", "gemini-cli"] as const;
+export type ProviderId = (typeof PROVIDER_IDS)[number];
+
 export interface AccountConfig {
   name: string;
   configDir: string;
   color: string;
   label: string;
-  provider: "claude-code";
+  provider: ProviderId;
   quotaPolicy?: Partial<QuotaPolicyConfig>;
 }
 
@@ -18,6 +21,15 @@ export interface HubConfig {
   schemaVersion: number;
   accounts: AccountConfig[];
   entire: { autoEnable: boolean };
+  notifications?: {
+    enabled: boolean;
+    events: {
+      rateLimit: boolean;
+      handoffReceived: boolean;
+      messageReceived: boolean;
+    };
+    muteList?: string[];
+  };
   defaults: {
     launchInNewWindow: boolean;
     quotaPolicy: QuotaPolicyConfig;

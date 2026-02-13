@@ -4,6 +4,7 @@ import { createConnection, type Socket } from "net";
 import { readFileSync, existsSync } from "fs";
 import { spawn } from "child_process";
 import { registerTools, type DaemonSender } from "./tools";
+import { createLineParser, generateRequestId, frameSend } from "../daemon/framing";
 
 const HUB_DIR = process.env.CLAUDE_HUB_DIR ?? `${process.env.HOME}/.claude-hub`;
 const DAEMON_SOCK_PATH = `${HUB_DIR}/hub.sock`;
@@ -15,12 +16,28 @@ function getToken(account: string): string {
 }
 
 function createDaemonSender(socket: Socket): DaemonSender {
+  const pending = new Map<string, { resolve: Function; reject: Function; timer: ReturnType<typeof setTimeout> }>();
+
+  const parser = createLineParser((msg) => {
+    if (msg.requestId && pending.has(msg.requestId)) {
+      const entry = pending.get(msg.requestId)!;
+      clearTimeout(entry.timer);
+      pending.delete(msg.requestId);
+      entry.resolve(msg);
+    }
+  });
+
+  socket.on("data", (data) => parser.feed(data));
+
   return (msg: object) =>
-    new Promise((resolve) => {
-      socket.once("data", (data) => {
-        resolve(JSON.parse(data.toString().trim()));
-      });
-      socket.write(JSON.stringify(msg) + "\n");
+    new Promise((resolve, reject) => {
+      const requestId = generateRequestId();
+      const timer = setTimeout(() => {
+        pending.delete(requestId);
+        reject(new Error("Request timed out (5s)"));
+      }, 5000);
+      pending.set(requestId, { resolve, reject, timer });
+      socket.write(frameSend({ ...msg, requestId }));
     });
 }
 
@@ -65,17 +82,19 @@ export async function startBridge(account: string): Promise<void> {
   // Connect to daemon
   const daemonSocket = createConnection(DAEMON_SOCK_PATH);
 
-  await new Promise<void>((resolve, reject) => {
-    daemonSocket.once("connect", () => {
-      // Authenticate
-      const token = getToken(account);
-      daemonSocket.write(JSON.stringify({ type: "auth", account, token }) + "\n");
-    });
+  // Set up the sender (and its parser) before auth so it can handle the auth response
+  const sendToDaemon = createDaemonSender(daemonSocket);
 
-    daemonSocket.once("data", (data) => {
-      const resp = JSON.parse(data.toString().trim());
-      if (resp.type === "auth_ok") resolve();
-      else reject(new Error(resp.error ?? "Auth failed"));
+  await new Promise<void>((resolve, reject) => {
+    daemonSocket.once("connect", async () => {
+      try {
+        const token = getToken(account);
+        const resp = await sendToDaemon({ type: "auth", account, token });
+        if (resp.type === "auth_ok") resolve();
+        else reject(new Error(resp.error ?? "Auth failed"));
+      } catch (err) {
+        reject(err);
+      }
     });
 
     daemonSocket.once("error", reject);
@@ -87,7 +106,6 @@ export async function startBridge(account: string): Promise<void> {
     { capabilities: { tools: {} } }
   );
 
-  const sendToDaemon = createDaemonSender(daemonSocket);
   registerTools(mcpServer, sendToDaemon, account);
 
   const transport = new StdioServerTransport();

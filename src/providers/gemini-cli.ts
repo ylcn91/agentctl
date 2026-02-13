@@ -7,6 +7,7 @@ import type {
   RawUsageData,
   Account,
   LaunchOpts,
+  ProcessInfo,
 } from "./types";
 
 const EMPTY_RAW: RawUsageData = {
@@ -29,7 +30,12 @@ const EMPTY_STATS: AgentStats = {
 export class GeminiCliProvider implements AgentProvider {
   id = "gemini-cli";
   displayName = "Gemini CLI";
+  icon = "🔵";
   supportsEntire = false;
+
+  async detectRunning(_account: Account): Promise<ProcessInfo | null> {
+    return null; // Not implemented for stub providers
+  }
 
   buildLaunchCommand(account: Account, opts: LaunchOpts): string[] {
     const configHome = account.configDir;

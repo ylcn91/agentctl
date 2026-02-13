@@ -1,53 +1,39 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { AccountCard } from "./AccountCard.js";
-import { ClaudeCodeProvider } from "../providers/claude-code.js";
-import { loadConfig } from "../config.js";
-import type { AccountConfig } from "../types.js";
-import type { AgentStats, QuotaEstimate } from "../providers/types.js";
-
-const provider = new ClaudeCodeProvider();
+import { loadDashboardData, type DashboardAccountData } from "../application/use-cases/load-dashboard-data.js";
 
 const VISIBLE_WINDOW = 8;
-
-interface AccountData {
-  account: AccountConfig;
-  stats: AgentStats;
-  quota: QuotaEstimate;
-}
+const REFRESH_INTERVAL_MS = 30_000;
 
 interface Props {
   onNavigate: (view: string) => void;
 }
 
 export function Dashboard({ onNavigate }: Props) {
-  const [accounts, setAccounts] = useState<AccountData[]>([]);
+  const [accounts, setAccounts] = useState<DashboardAccountData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [entireStatuses, setEntireStatuses] = useState<Map<string, string>>(new Map());
+  const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Auto-refresh polling
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefreshTick((prev) => prev + 1);
+    }, REFRESH_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     async function load() {
       try {
-        const config = await loadConfig();
-        const data: AccountData[] = [];
-
-        for (const account of config.accounts) {
-          const configDir = account.configDir.replace("~", process.env.HOME!);
-          const statsPath = `${configDir}/stats-cache.json`;
-          const stats = await provider.parseStatsFromFile(statsPath);
-          const quotaPolicy = {
-            ...config.defaults.quotaPolicy,
-            ...(account.quotaPolicy ?? {}),
-          };
-          const quota = provider.estimateQuota(
-            stats.todayActivity?.messageCount ?? 0,
-            quotaPolicy
-          );
-          data.push({ account, stats, quota });
-        }
-
-        setAccounts(data);
+        const data = await loadDashboardData();
+        setAccounts(data.accounts);
+        setEntireStatuses(data.entireStatuses);
+        setUnreadCounts(data.unreadCounts);
       } catch (e: any) {
         setError(e.message);
       } finally {
@@ -55,7 +41,7 @@ export function Dashboard({ onNavigate }: Props) {
       }
     }
     load();
-  }, []);
+  }, [refreshTick]);
 
   useInput((input, key) => {
     if (key.upArrow) {
@@ -110,19 +96,20 @@ export function Dashboard({ onNavigate }: Props) {
   return (
     <Box flexDirection="column" paddingY={1}>
       {aboveCount > 0 && (
-        <Text color="gray">{`▲ ${aboveCount} more`}</Text>
+        <Text color="gray">{`\u25B2 ${aboveCount} more`}</Text>
       )}
-      {visibleAccounts.map((a, i) => (
+      {visibleAccounts.map((a) => (
         <AccountCard
           key={a.account.name}
           account={a.account}
           stats={a.stats}
           quota={a.quota}
-          unreadMessages={0}
+          entireStatus={entireStatuses.get(a.account.name)}
+          unreadMessages={unreadCounts.get(a.account.name) ?? 0}
         />
       ))}
       {belowCount > 0 && (
-        <Text color="gray">{`▼ ${belowCount} more`}</Text>
+        <Text color="gray">{`\u25BC ${belowCount} more`}</Text>
       )}
     </Box>
   );

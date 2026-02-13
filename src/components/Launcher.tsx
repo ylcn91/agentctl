@@ -2,16 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import SelectInput from "ink-select-input";
 import TextInput from "ink-text-input";
-import { ClaudeCodeProvider } from "../providers/claude-code.js";
 import { loadConfig } from "../config.js";
-import { getEntireCheckpoints, isEntireInstalled, enableEntire } from "../services/entire.js";
+import { getEntireCheckpoints, isEntireInstalled } from "../services/entire.js";
+import { launchAccount } from "../application/use-cases/launch-account.js";
 import type { AccountConfig } from "../types.js";
 import type { EntireCheckpoint } from "../services/entire.js";
-import type { Account } from "../providers/types.js";
 
-const provider = new ClaudeCodeProvider();
-
-type Step = "account" | "directory" | "options" | "launching";
+type Step = "account" | "directory" | "options" | "checkpoint" | "launching";
 
 interface LaunchOptions {
   resume: boolean;
@@ -38,6 +35,7 @@ export function Launcher({ onNavigate }: Props) {
   const [optionIndex, setOptionIndex] = useState(0);
   const [checkpoints, setCheckpoints] = useState<EntireCheckpoint[]>([]);
   const [entireAvailable, setEntireAvailable] = useState(false);
+  const [selectedCheckpointId, setSelectedCheckpointId] = useState<string | null>(null);
   const [launchStatus, setLaunchStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +67,9 @@ export function Launcher({ onNavigate }: Props) {
         setStep("account");
       } else if (step === "options") {
         setStep("directory");
+      } else if (step === "checkpoint") {
+        setSelectedCheckpointId(null);
+        setStep("options");
       }
       return;
     }
@@ -85,7 +86,11 @@ export function Launcher({ onNavigate }: Props) {
           return { ...prev, [key]: !prev[key] };
         });
       } else if (key.return) {
-        doLaunch();
+        if (options.resume && checkpoints.length > 0) {
+          setStep("checkpoint");
+        } else {
+          doLaunch();
+        }
       }
     }
   });
@@ -103,48 +108,33 @@ export function Launcher({ onNavigate }: Props) {
     setStep("options");
   }
 
-  async function doLaunch() {
+  function handleCheckpointSelect(item: { value: string }) {
+    setSelectedCheckpointId(item.value);
+    doLaunch(item.value);
+  }
+
+  async function doLaunch(checkpointId?: string) {
     if (!selectedAccount) return;
     setStep("launching");
 
-    const configDir = selectedAccount.configDir.replace("~", process.env.HOME!);
-    const account: Account = {
-      name: selectedAccount.name,
-      configDir,
-      provider: selectedAccount.provider,
-    };
-
-    // Auto-enable Entire if opted in
-    if (options.autoEntire && entireAvailable) {
-      setLaunchStatus("Checking Entire...");
-      const result = await enableEntire(directory);
-      if (!result.success && result.error && !result.error.includes("already")) {
-        setLaunchStatus(`Entire: ${result.error}`);
-        // Continue with launch anyway
-      }
-    }
-
-    const cmd = provider.buildLaunchCommand(account, {
+    const result = await launchAccount(selectedAccount.name, {
       dir: directory,
       resume: options.resume,
       bypassPermissions: options.bypassPermissions,
+      noEntire: !options.autoEntire,
+      noWindow: !options.newWindow,
+      checkpointId: checkpointId ?? selectedCheckpointId ?? undefined,
+      onStatus: setLaunchStatus,
     });
 
-    // cmd is [env, "claude", ...args]
-    const envPart = cmd[0]; // CLAUDE_CONFIG_DIR=...
-    const args = cmd.slice(1); // ["claude", ...]
-    const shellCmd = `${envPart} ${args.join(" ")}`;
-
-    try {
-      if (options.newWindow) {
-        const { $ } = await import("bun");
-        await $`open -a WezTerm -- zsh -c ${shellCmd}`.quiet();
-        setLaunchStatus(`Launched ${selectedAccount.name} in new window`);
+    if (result.success) {
+      if (options.newWindow && result.terminalName) {
+        setLaunchStatus(`Launched ${selectedAccount.name} in ${result.terminalName}`);
       } else {
-        setLaunchStatus(`Run manually: ${shellCmd}`);
+        setLaunchStatus(`Run manually: ${result.shellCmd}`);
       }
-    } catch (e: any) {
-      setLaunchStatus(`Launch failed: ${e.message}`);
+    } else {
+      setLaunchStatus(result.error ?? "Launch failed");
     }
   }
 
@@ -240,6 +230,24 @@ export function Launcher({ onNavigate }: Props) {
         <Box marginTop={1}>
           <Text color="gray">[Space] Toggle  [Enter] Launch  [Esc] Back</Text>
         </Box>
+      </Box>
+    );
+  }
+
+  if (step === "checkpoint") {
+    const items = checkpoints.map((cp) => {
+      const time = cp.createdAt ? new Date(cp.createdAt).toLocaleString() : "unknown";
+      return {
+        label: `${cp.checkpointId.slice(0, 8)} | ${cp.branch} | ${cp.filesTouched.length} files | ${time}`,
+        value: cp.checkpointId,
+      };
+    });
+
+    return (
+      <Box flexDirection="column" paddingY={1}>
+        <Text bold>Select checkpoint to resume:</Text>
+        <SelectInput items={items} onSelect={handleCheckpointSelect} />
+        <Text color="gray">[Enter] Select  [Esc] Back</Text>
       </Box>
     );
   }

@@ -26,15 +26,24 @@ function createMockDaemon(messages: any[]): Promise<{ server: Server; sockPath: 
   return new Promise((resolve) => {
     const sockPath = join(TEST_DIR, "hub.sock");
     const server = createServer((socket) => {
+      let buffer = "";
       socket.on("data", (data) => {
-        try {
-          const msg = JSON.parse(data.toString());
-          if (msg.type === "auth") {
-            socket.write(JSON.stringify({ type: "auth_ok" }) + "\n");
-          } else if (msg.type === "read_messages") {
-            socket.write(JSON.stringify({ type: "result", messages }) + "\n");
-          }
-        } catch {}
+        buffer += data.toString();
+        const lines = buffer.split("\n");
+        buffer = lines.pop()!;
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const msg = JSON.parse(trimmed);
+            const rid = msg.requestId ? { requestId: msg.requestId } : {};
+            if (msg.type === "auth") {
+              socket.write(JSON.stringify({ type: "auth_ok", ...rid }) + "\n");
+            } else if (msg.type === "read_messages") {
+              socket.write(JSON.stringify({ type: "result", messages, ...rid }) + "\n");
+            }
+          } catch {}
+        }
       });
     });
     server.listen(sockPath, () => resolve({ server, sockPath }));

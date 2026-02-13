@@ -7,6 +7,7 @@ import type {
   RawUsageData,
   Account,
   LaunchOpts,
+  ProcessInfo,
 } from "./types";
 
 const EMPTY_RAW: RawUsageData = {
@@ -56,7 +57,27 @@ function makeRollingWindowPolicy(
 export class ClaudeCodeProvider implements AgentProvider {
   id = "claude-code";
   displayName = "Claude Code";
+  icon = "🟣";
   supportsEntire = true;
+
+  async detectRunning(account: Account): Promise<ProcessInfo | null> {
+    try {
+      const result = await Bun.$`ps aux`.quiet();
+      const lines = result.stdout.toString().split("\n");
+      for (const line of lines) {
+        if (line.includes("claude") && line.includes(account.configDir)) {
+          const parts = line.trim().split(/\s+/);
+          const pid = parseInt(parts[1], 10);
+          if (!isNaN(pid)) {
+            return { pid, configDir: account.configDir };
+          }
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
 
   buildLaunchCommand(account: Account, opts: LaunchOpts): string[] {
     const env = `CLAUDE_CONFIG_DIR=${account.configDir}`;

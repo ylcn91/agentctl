@@ -1,3 +1,5 @@
+import { MessageStore } from "./message-store";
+
 export interface Message {
   id?: string;
   from: string;
@@ -11,8 +13,12 @@ export interface Message {
 
 export class DaemonState {
   private connectedAccounts = new Map<string, { token: string; connectedAt: string }>();
-  private messages: Message[] = [];
+  private store: MessageStore;
   onMessagePersist?: (msg: Message) => Promise<void>;
+
+  constructor(dbPath?: string) {
+    this.store = new MessageStore(dbPath);
+  }
 
   connectAccount(name: string, token: string): void {
     this.connectedAccounts.set(name, { token, connectedAt: new Date().toISOString() });
@@ -35,29 +41,43 @@ export class DaemonState {
     return entry?.token === token;
   }
 
-  addMessage(msg: Message): void {
-    const stored = { ...msg, id: crypto.randomUUID(), read: false };
-    this.messages.push(stored);
+  addMessage(msg: Message): string {
+    const id = this.store.addMessage({
+      from: msg.from,
+      to: msg.to,
+      type: msg.type,
+      content: msg.content,
+      timestamp: msg.timestamp,
+      context: msg.context,
+    });
+    const stored = { ...msg, id, read: false };
     if (this.onMessagePersist) {
       this.onMessagePersist(stored).catch(() => {});
     }
+    return id;
   }
 
-  getMessages(to: string): Message[] {
-    return this.messages.filter((m) => m.to === to);
+  getMessages(to: string, opts?: { limit?: number; offset?: number }): Message[] {
+    return this.store.getMessages(to, opts);
   }
 
   getUnreadMessages(to: string): Message[] {
-    return this.messages.filter((m) => m.to === to && !m.read);
+    return this.store.getUnreadMessages(to);
   }
 
   markAllRead(to: string): void {
-    for (const m of this.messages) {
-      if (m.to === to) m.read = true;
-    }
+    this.store.markAllRead(to);
   }
 
   getHandoffs(to: string): Message[] {
-    return this.messages.filter((m) => m.to === to && m.type === "handoff");
+    return this.store.getHandoffs(to);
+  }
+
+  archiveOld(days?: number): number {
+    return this.store.archiveOld(days);
+  }
+
+  close(): void {
+    this.store.close();
   }
 }

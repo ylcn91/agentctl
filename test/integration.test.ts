@@ -14,6 +14,11 @@ import type { Server } from "net";
 const TEST_DIR = join(import.meta.dir, ".test-integration");
 const CLI_PATH = join(import.meta.dir, "..", "src", "cli.tsx");
 
+let intDbCounter = 0;
+function uniqueDbPath(dir: string): string {
+  return join(dir, `test-${++intDbCounter}-${Date.now()}.db`);
+}
+
 const origHubDir = process.env.CLAUDE_HUB_DIR;
 
 beforeAll(() => {
@@ -219,6 +224,7 @@ describe("stats parsing from fixtures", () => {
 describe("daemon start/stop lifecycle", () => {
   const daemonDir = join(TEST_DIR, "daemon-lifecycle");
   let server: Server;
+  let daemonState: DaemonState;
   let originalHubDir: string | undefined;
 
   beforeEach(() => {
@@ -230,13 +236,15 @@ describe("daemon start/stop lifecycle", () => {
 
   afterEach(() => {
     process.env.CLAUDE_HUB_DIR = originalHubDir;
+    try { if (daemonState) daemonState.close(); } catch {}
     try { if (server) stopDaemon(server); } catch {}
     rmSync(daemonDir, { recursive: true, force: true });
   });
 
   test("daemon starts on unix socket and accepts connections", async () => {
-    const result = startDaemon();
+    const result = startDaemon({ dbPath: uniqueDbPath(daemonDir) });
     server = result.server;
+    daemonState = result.state;
 
     const sockPath = join(daemonDir, "hub.sock");
     expect(existsSync(sockPath)).toBe(true);
@@ -261,13 +269,16 @@ describe("daemon start/stop lifecycle", () => {
   });
 
   test("daemon stops cleanly and removes socket", async () => {
-    const result = startDaemon();
+    const result = startDaemon({ dbPath: uniqueDbPath(daemonDir) });
     server = result.server;
+    daemonState = result.state;
     const sockPath = join(daemonDir, "hub.sock");
 
     await Bun.sleep(50);
     expect(existsSync(sockPath)).toBe(true);
 
+    daemonState.close();
+    daemonState = null as any;
     stopDaemon(server);
     // After stop, socket should be cleaned up
     expect(existsSync(sockPath)).toBe(false);
@@ -276,8 +287,9 @@ describe("daemon start/stop lifecycle", () => {
   });
 
   test("daemon state tracks connected accounts after start", async () => {
-    const result = startDaemon();
+    const result = startDaemon({ dbPath: uniqueDbPath(daemonDir) });
     server = result.server;
+    daemonState = result.state;
 
     expect(result.state).toBeDefined();
     expect(result.state.getConnectedAccounts()).toEqual([]);
@@ -302,13 +314,14 @@ describe("bridge connect + message send/receive through daemon", () => {
     writeFileSync(join(bridgeDir, "tokens", "alice.token"), "alice-secret");
     writeFileSync(join(bridgeDir, "tokens", "bob.token"), "bob-secret");
 
-    const result = startDaemon();
+    const result = startDaemon({ dbPath: uniqueDbPath(bridgeDir) });
     server = result.server;
     state = result.state;
   });
 
   afterEach(() => {
     process.env.CLAUDE_HUB_DIR = originalHubDir;
+    try { state.close(); } catch {}
     try { stopDaemon(server); } catch {}
     rmSync(bridgeDir, { recursive: true, force: true });
   });
@@ -385,10 +398,16 @@ describe("bridge connect + message send/receive through daemon", () => {
 
     const alice = await connectAndAuth("alice", "alice-secret");
 
+    const handoffPayload = {
+      goal: "Deploy the auth module",
+      acceptance_criteria: ["Auth endpoints respond correctly"],
+      run_commands: ["bun test"],
+      blocked_by: ["none"],
+    };
     const handoffResult = await sendAndReceive(alice, {
       type: "handoff_task",
       to: "bob",
-      task: "Deploy the auth module",
+      payload: handoffPayload,
       context: { branch: "feat/auth", projectDir: "/projects/webapp" },
     });
     expect(handoffResult.queued).toBe(true);
@@ -398,7 +417,7 @@ describe("bridge connect + message send/receive through daemon", () => {
     // Verify in state
     const handoffs = state.getHandoffs("bob");
     expect(handoffs).toHaveLength(1);
-    expect(handoffs[0].content).toBe("Deploy the auth module");
+    expect(handoffs[0].content).toBe(JSON.stringify(handoffPayload));
     expect(handoffs[0].type).toBe("handoff");
 
     alice.destroy();
@@ -477,6 +496,7 @@ describe("10 concurrent atomic writes produce no data corruption", () => {
 describe("token auth: invalid token is rejected by daemon", () => {
   const authDir = join(TEST_DIR, "auth-test");
   let server: Server;
+  let authState: DaemonState;
   let originalHubDir: string | undefined;
 
   beforeEach(() => {
@@ -486,12 +506,14 @@ describe("token auth: invalid token is rejected by daemon", () => {
     mkdirSync(join(authDir, "messages"), { recursive: true });
     writeFileSync(join(authDir, "tokens", "valid-acct.token"), "correct-token");
 
-    const result = startDaemon();
+    const result = startDaemon({ dbPath: uniqueDbPath(authDir) });
     server = result.server;
+    authState = result.state;
   });
 
   afterEach(() => {
     process.env.CLAUDE_HUB_DIR = originalHubDir;
+    try { authState.close(); } catch {}
     try { stopDaemon(server); } catch {}
     rmSync(authDir, { recursive: true, force: true });
   });

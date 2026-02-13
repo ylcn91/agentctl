@@ -8,6 +8,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 const TEST_DIR = join(import.meta.dir, ".test-handoff");
 const TEST_MESSAGES_DIR = join(TEST_DIR, "messages");
 
+let dbCounter = 0;
+function uniqueDbPath(): string {
+  return join(TEST_DIR, `test-${++dbCounter}-${Date.now()}.db`);
+}
+
 beforeEach(() => {
   mkdirSync(TEST_MESSAGES_DIR, { recursive: true });
   process.env.CLAUDE_HUB_DIR = TEST_DIR;
@@ -20,7 +25,7 @@ afterEach(() => {
 
 describe("handoff_task", () => {
   test("DaemonState stores handoff messages with context", () => {
-    const state = new DaemonState();
+    const state = new DaemonState(uniqueDbPath());
     state.addMessage({
       from: "claude-work",
       to: "claude-admin",
@@ -40,10 +45,11 @@ describe("handoff_task", () => {
     expect(msgs[0].content).toBe("Deploy the auth module to staging");
     expect(msgs[0].context?.branch).toBe("feat/auth");
     expect(msgs[0].context?.projectDir).toBe("/projects/webapp");
+    state.close();
   });
 
   test("handoff messages appear in unread messages", () => {
-    const state = new DaemonState();
+    const state = new DaemonState(uniqueDbPath());
     state.addMessage({
       from: "claude-work",
       to: "claude-admin",
@@ -59,10 +65,11 @@ describe("handoff_task", () => {
 
     state.markAllRead("claude-admin");
     expect(state.getUnreadMessages("claude-admin")).toHaveLength(0);
+    state.close();
   });
 
   test("handoff messages are persisted to messages dir", async () => {
-    const state = new DaemonState();
+    const state = new DaemonState(uniqueDbPath());
     state.onMessagePersist = async (msg) => {
       await Bun.write(
         join(TEST_MESSAGES_DIR, `${msg.id}.json`),
@@ -89,6 +96,7 @@ describe("handoff_task", () => {
     expect(persisted.type).toBe("handoff");
     expect(persisted.content).toBe("Take over the deploy");
     expect(persisted.context.branch).toBe("main");
+    state.close();
   });
 
   test("registerTools includes handoff_task tool", () => {
@@ -115,7 +123,7 @@ describe("handoff_task", () => {
   });
 
   test("mixed message and handoff types are filtered correctly", () => {
-    const state = new DaemonState();
+    const state = new DaemonState(uniqueDbPath());
     state.addMessage({
       from: "a", to: "b", type: "message",
       content: "hello", timestamp: new Date().toISOString(),
@@ -137,5 +145,6 @@ describe("handoff_task", () => {
     expect(handoffs).toHaveLength(1);
     expect(handoffs[0].type).toBe("handoff");
     expect(handoffs[0].context?.branch).toBe("main");
+    state.close();
   });
 });

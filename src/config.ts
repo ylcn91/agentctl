@@ -47,6 +47,26 @@ export function removeAccount(config: HubConfig, name: string): HubConfig {
   return { ...config, accounts: config.accounts.filter((a) => a.name !== name) };
 }
 
+export async function setConfigValue(dotPath: string, value: string): Promise<{ oldValue: unknown; newValue: unknown }> {
+  const config = await loadConfig();
+  const keys = dotPath.split(".");
+  let obj: any = config;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (obj[keys[i]] === undefined) throw new Error(`Invalid config path: ${dotPath}`);
+    obj = obj[keys[i]];
+  }
+  const lastKey = keys[keys.length - 1];
+  const oldValue = obj[lastKey];
+  // Try to parse value as number or boolean
+  let parsed: any = value;
+  if (value === "true") parsed = true;
+  else if (value === "false") parsed = false;
+  else if (!isNaN(Number(value)) && value !== "") parsed = Number(value);
+  obj[lastKey] = parsed;
+  await saveConfig(config);
+  return { oldValue, newValue: parsed };
+}
+
 export async function migrateConfig(
   path?: string
 ): Promise<{ migrated: boolean; backupPath: string | null }> {

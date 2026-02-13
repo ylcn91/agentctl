@@ -8,8 +8,6 @@ import {
   updateTaskStatus,
   assignTask,
   removeTask,
-  type Task,
-  type TaskBoard,
 } from "../src/services/tasks";
 
 const TEST_DIR = join(import.meta.dir, ".test-tasks");
@@ -29,12 +27,12 @@ describe("tasks service", () => {
     expect(board.tasks).toEqual([]);
   });
 
-  test("addTask creates a new pending task", async () => {
+  test("addTask creates a new todo task", async () => {
     let board = await loadTasks(TEST_TASKS_PATH);
     board = addTask(board, "Implement auth module");
     expect(board.tasks).toHaveLength(1);
     expect(board.tasks[0].title).toBe("Implement auth module");
-    expect(board.tasks[0].status).toBe("pending");
+    expect(board.tasks[0].status).toBe("todo");
     expect(board.tasks[0].assignee).toBeUndefined();
     expect(board.tasks[0].id).toBeDefined();
   });
@@ -51,16 +49,16 @@ describe("tasks service", () => {
     expect(loaded.tasks[1].title).toBe("Task B");
   });
 
-  test("updateTaskStatus changes status", async () => {
+  test("updateTaskStatus changes status through valid transitions", async () => {
     let board = await loadTasks(TEST_TASKS_PATH);
     board = addTask(board, "Deploy to staging");
     const taskId = board.tasks[0].id;
 
-    board = updateTaskStatus(board, taskId, "in-progress");
-    expect(board.tasks[0].status).toBe("in-progress");
+    board = updateTaskStatus(board, taskId, "in_progress");
+    expect(board.tasks[0].status).toBe("in_progress");
 
-    board = updateTaskStatus(board, taskId, "done");
-    expect(board.tasks[0].status).toBe("done");
+    board = updateTaskStatus(board, taskId, "ready_for_review");
+    expect(board.tasks[0].status).toBe("ready_for_review");
   });
 
   test("assignTask sets assignee", async () => {
@@ -93,13 +91,11 @@ describe("tasks service", () => {
     expect(board.tasks[0].title).toBe("Task B");
   });
 
-  test("updateTaskStatus on nonexistent task is a no-op", async () => {
+  test("updateTaskStatus on nonexistent task throws", async () => {
     let board = await loadTasks(TEST_TASKS_PATH);
     board = addTask(board, "Only task");
 
-    board = updateTaskStatus(board, "nonexistent-id", "done");
-    expect(board.tasks).toHaveLength(1);
-    expect(board.tasks[0].status).toBe("pending");
+    expect(() => updateTaskStatus(board, "nonexistent-id", "in_progress")).toThrow("not found");
   });
 
   test("tasks preserve createdAt timestamp", async () => {

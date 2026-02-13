@@ -1,56 +1,19 @@
 import chalk from "chalk";
 import { loadConfig } from "../config";
-import { ClaudeCodeProvider } from "../providers/claude-code";
-import type { AccountConfig } from "../types";
-import type { AgentStats } from "../providers/types";
-
-const provider = new ClaudeCodeProvider();
-
-interface AccountStatus {
-  account: AccountConfig;
-  stats: AgentStats;
-  quotaLabel: string;
-  quotaPercent: number;
-}
-
-async function getAccountStatuses(configPath?: string): Promise<AccountStatus[]> {
-  const config = await loadConfig(configPath);
-  const results: AccountStatus[] = [];
-
-  for (const account of config.accounts) {
-    const configDir = account.configDir.replace(/^~/, process.env.HOME ?? "");
-    const statsPath = `${configDir}/stats-cache.json`;
-    const stats = await provider.parseStatsFromFile(statsPath);
-    const quotaPolicy = {
-      ...config.defaults.quotaPolicy,
-      ...(account.quotaPolicy ?? {}),
-    };
-    const quota = provider.estimateQuota(
-      stats.todayActivity?.messageCount ?? 0,
-      quotaPolicy
-    );
-    results.push({
-      account,
-      stats,
-      quotaLabel: quota.label,
-      quotaPercent: quota.percent,
-    });
-  }
-
-  return results;
-}
+import { loadDashboardData } from "../application/use-cases/load-dashboard-data.js";
+import { launchAccount } from "../application/use-cases/launch-account.js";
 
 export async function statusCommand(configPath?: string): Promise<string> {
-  const statuses = await getAccountStatuses(configPath);
+  const data = await loadDashboardData(configPath);
 
-  if (statuses.length === 0) {
+  if (data.accounts.length === 0) {
     return "No accounts configured. Run: ch add <name>";
   }
 
-  const lines = statuses.map((s) => {
+  const lines = data.accounts.map((s) => {
     const name = chalk.hex(s.account.color).bold(s.account.name);
     const msgs = s.stats.todayActivity?.messageCount ?? 0;
-    const label = s.quotaPercent >= 0 ? s.quotaLabel : "unknown";
+    const label = s.quota.percent >= 0 ? s.quota.label : "unknown";
     return `${name}  ${msgs} msgs today  ${label}`;
   });
 
@@ -58,20 +21,20 @@ export async function statusCommand(configPath?: string): Promise<string> {
 }
 
 export async function usageCommand(configPath?: string): Promise<string> {
-  const statuses = await getAccountStatuses(configPath);
+  const data = await loadDashboardData(configPath);
 
-  if (statuses.length === 0) {
+  if (data.accounts.length === 0) {
     return "No accounts configured. Run: ch add <name>";
   }
 
   const header = `${"Account".padEnd(20)} ${"Today".padEnd(8)} ${"Total".padEnd(10)} ${"Quota".padEnd(20)}`;
   const divider = "-".repeat(header.length);
 
-  const rows = statuses.map((s) => {
+  const rows = data.accounts.map((s) => {
     const name = s.account.name.padEnd(20);
     const today = String(s.stats.todayActivity?.messageCount ?? 0).padEnd(8);
     const total = String(s.stats.totalMessages).padEnd(10);
-    const quota = s.quotaPercent >= 0 ? s.quotaLabel : "unknown";
+    const quota = s.quota.percent >= 0 ? s.quota.label : "unknown";
     return `${name} ${today} ${total} ${quota.padEnd(20)}`;
   });
 
@@ -93,4 +56,28 @@ export async function listCommand(configPath?: string): Promise<string> {
   });
 
   return lines.join("\n");
+}
+
+export async function launchCommand(
+  accountName: string,
+  dir?: string,
+  opts?: { resume?: boolean; noWindow?: boolean; bypassPermissions?: boolean; noEntire?: boolean }
+): Promise<string> {
+  const result = await launchAccount(accountName, {
+    dir,
+    resume: opts?.resume,
+    noWindow: opts?.noWindow,
+    bypassPermissions: opts?.bypassPermissions,
+    noEntire: opts?.noEntire,
+  });
+
+  if (!result.success) {
+    throw new Error(result.error ?? "Launch failed");
+  }
+
+  if (opts?.noWindow) {
+    return result.shellCmd;
+  }
+
+  return `Launched ${accountName} in ${result.terminalName ?? "terminal"} (dir: ${dir ?? process.cwd()})`;
 }

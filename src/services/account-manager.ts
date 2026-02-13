@@ -4,7 +4,7 @@ import { join, dirname } from "path";
 import { randomBytes } from "crypto";
 import { loadConfig, saveConfig, addAccount, removeAccount } from "../config";
 import { TOKENS_DIR } from "../types";
-import type { AccountConfig } from "../types";
+import type { AccountConfig, ProviderId } from "../types";
 
 export const CATPPUCCIN_COLORS = [
   { name: "Mauve", hex: "#cba6f7" },
@@ -26,6 +26,7 @@ export interface SetupAccountOptions {
   configDir: string;
   color: string;
   label: string;
+  provider?: ProviderId;
   symlinkPlugins?: boolean;
   symlinkSkills?: boolean;
   symlinkCommands?: boolean;
@@ -84,7 +85,7 @@ export async function setupAccount(opts: SetupAccountOptions): Promise<{
     configDir: opts.configDir,
     color: opts.color,
     label: opts.label,
-    provider: "claude-code",
+    provider: opts.provider ?? "claude-code",
   };
 
   const config = await loadConfig(opts.configPath);

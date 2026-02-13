@@ -1,6 +1,15 @@
 import { atomicWrite, atomicRead } from "./file-store";
 
-export type TaskStatus = "pending" | "in-progress" | "done";
+export type TaskStatus = "todo" | "in_progress" | "ready_for_review" | "accepted" | "rejected";
+export type TaskPriority = "P0" | "P1" | "P2";
+
+export interface TaskEvent {
+  type: "status_changed" | "review_rejected" | "review_accepted";
+  timestamp: string;
+  from?: TaskStatus;
+  to?: TaskStatus;
+  reason?: string;
+}
 
 export interface Task {
   id: string;
@@ -8,7 +17,19 @@ export interface Task {
   status: TaskStatus;
   assignee?: string;
   createdAt: string;
+  priority?: TaskPriority;
+  dueDate?: string;
+  tags?: string[];
+  events: TaskEvent[];
 }
+
+export const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
+  todo: ["in_progress"],
+  in_progress: ["ready_for_review"],
+  ready_for_review: ["accepted", "rejected"],
+  accepted: [],
+  rejected: [],
+};
 
 export interface TaskBoard {
   tasks: Task[];
@@ -33,20 +54,94 @@ export async function saveTasks(board: TaskBoard, path?: string): Promise<void> 
   await atomicWrite(tasksPath, board);
 }
 
-export function addTask(board: TaskBoard, title: string, assignee?: string): TaskBoard {
+export function addTask(
+  board: TaskBoard,
+  title: string,
+  assignee?: string,
+  opts?: { priority?: TaskPriority; dueDate?: string; tags?: string[] }
+): TaskBoard {
   const task: Task = {
     id: crypto.randomUUID(),
     title,
-    status: "pending",
+    status: "todo",
     assignee,
     createdAt: new Date().toISOString(),
+    priority: opts?.priority,
+    dueDate: opts?.dueDate,
+    tags: opts?.tags,
+    events: [],
   };
   return { tasks: [...board.tasks, task] };
 }
 
+const PRIORITY_RANK: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
+
+export function sortByPriority(tasks: Task[]): Task[] {
+  return [...tasks].sort((a, b) => {
+    const pa = PRIORITY_RANK[a.priority ?? "P2"] ?? 2;
+    const pb = PRIORITY_RANK[b.priority ?? "P2"] ?? 2;
+    return pa - pb;
+  });
+}
+
 export function updateTaskStatus(board: TaskBoard, id: string, status: TaskStatus): TaskBoard {
+  const task = board.tasks.find((t) => t.id === id);
+  if (!task) throw new Error(`Task ${id} not found`);
+
+  const allowed = VALID_TRANSITIONS[task.status];
+  if (!allowed.includes(status)) {
+    throw new Error(`Invalid transition: ${task.status} → ${status}`);
+  }
+
+  const now = new Date().toISOString();
+  const events: TaskEvent[] = [
+    ...task.events,
+    { type: "status_changed", timestamp: now, from: task.status, to: status },
+  ];
+
   return {
-    tasks: board.tasks.map((t) => (t.id === id ? { ...t, status } : t)),
+    tasks: board.tasks.map((t) => (t.id === id ? { ...t, status, events } : t)),
+  };
+}
+
+export function rejectTask(board: TaskBoard, id: string, reason: string): TaskBoard {
+  if (!reason) throw new Error("Reason is required when rejecting a task");
+
+  const task = board.tasks.find((t) => t.id === id);
+  if (!task) throw new Error(`Task ${id} not found`);
+  if (task.status !== "ready_for_review") {
+    throw new Error(`Cannot reject task: status is ${task.status}, expected ready_for_review`);
+  }
+
+  const now = new Date().toISOString();
+  const events: TaskEvent[] = [
+    ...task.events,
+    { type: "status_changed", timestamp: now, from: "ready_for_review", to: "rejected" },
+    { type: "review_rejected", timestamp: now, from: "ready_for_review", to: "rejected", reason },
+    { type: "status_changed", timestamp: now, from: "rejected", to: "in_progress" },
+  ];
+
+  return {
+    tasks: board.tasks.map((t) => (t.id === id ? { ...t, status: "in_progress" as TaskStatus, events } : t)),
+  };
+}
+
+export function acceptTask(board: TaskBoard, id: string): TaskBoard {
+  const task = board.tasks.find((t) => t.id === id);
+  if (!task) throw new Error(`Task ${id} not found`);
+  if (task.status !== "ready_for_review") {
+    throw new Error(`Cannot accept task: status is ${task.status}, expected ready_for_review`);
+  }
+
+  const now = new Date().toISOString();
+  const events: TaskEvent[] = [
+    ...task.events,
+    { type: "status_changed", timestamp: now, from: "ready_for_review", to: "accepted" },
+    { type: "review_accepted", timestamp: now, from: "ready_for_review", to: "accepted" },
+  ];
+
+  return {
+    tasks: board.tasks.map((t) => (t.id === id ? { ...t, status: "accepted" as TaskStatus, events } : t)),
   };
 }
 

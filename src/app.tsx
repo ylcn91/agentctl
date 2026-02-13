@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, useInput } from "ink";
+import { loadConfig } from "./config.js";
 import { Header } from "./components/Header.js";
 import { Dashboard } from "./components/Dashboard.js";
 import { Launcher } from "./components/Launcher.js";
@@ -19,6 +20,13 @@ const NAV_KEYS: Record<string, string> = {
 
 export function App() {
   const [view, setView] = useState("dashboard");
+  const [accountNames, setAccountNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadConfig().then((config) => {
+      setAccountNames(config.accounts.map((a) => a.name));
+    }).catch(() => {});
+  }, []);
 
   // Global navigation - works from any view
   useInput((input, key) => {
@@ -35,7 +43,7 @@ export function App() {
       {view === "launcher" && <Launcher onNavigate={setView} />}
       {view === "usage" && <UsageDetail onNavigate={setView} />}
       {view === "add" && <AddAccount onDone={() => setView("dashboard")} />}
-      {view === "tasks" && <TaskBoard onNavigate={setView} />}
+      {view === "tasks" && <TaskBoard onNavigate={setView} accounts={accountNames} />}
       {view === "inbox" && <MessageInbox onNavigate={setView} />}
     </Box>
   );

@@ -1,6 +1,10 @@
 import { createServer, type Server } from "net";
-import { existsSync, unlinkSync, writeFileSync, readFileSync, mkdirSync } from "fs";
+import { existsSync, unlinkSync, writeFileSync, readFileSync } from "fs";
 import { DaemonState } from "./state";
+import { createLineParser, frameSend } from "./framing";
+import { notifyHandoff, notifyMessage } from "../services/notifications";
+import { validateHandoff } from "../services/handoff";
+import { loadTasks, saveTasks, updateTaskStatus, rejectTask, acceptTask, type TaskStatus } from "../services/tasks";
 
 function getHubDir(): string {
   return process.env.CLAUDE_HUB_DIR ?? `${process.env.HOME}/.claude-hub`;
@@ -18,10 +22,6 @@ function getTokensDir(): string {
   return `${getHubDir()}/tokens`;
 }
 
-function getMessagesDir(): string {
-  return `${getHubDir()}/messages`;
-}
-
 export function verifyAccountToken(account: string, token: string): boolean {
   const tokenPath = `${getTokensDir()}/${account}.token`;
   try {
@@ -32,23 +32,13 @@ export function verifyAccountToken(account: string, token: string): boolean {
   }
 }
 
-export function startDaemon(): { server: Server; state: DaemonState } {
-  const state = new DaemonState();
+function reply(msg: any, response: object): string {
+  return frameSend({ ...response, ...(msg.requestId ? { requestId: msg.requestId } : {}) });
+}
+
+export function startDaemon(opts?: { dbPath?: string }): { server: Server; state: DaemonState } {
+  const state = new DaemonState(opts?.dbPath);
   const sockPath = getSockPath();
-  const messagesDir = getMessagesDir();
-
-  // Ensure messages dir exists for persistence
-  mkdirSync(messagesDir, { recursive: true });
-
-  // Persist handoff messages to disk
-  state.onMessagePersist = async (msg) => {
-    if (msg.type === "handoff" && msg.id) {
-      await Bun.write(
-        `${messagesDir}/${msg.id}.json`,
-        JSON.stringify(msg, null, 2)
-      );
-    }
-  };
 
   // Cleanup orphaned socket
   if (existsSync(sockPath)) unlinkSync(sockPath);
@@ -57,72 +47,122 @@ export function startDaemon(): { server: Server; state: DaemonState } {
     let authenticated = false;
     let accountName = "";
 
-    socket.on("data", (data) => {
-      try {
-        const msg = JSON.parse(data.toString());
-
-        // First message must be auth handshake
-        if (!authenticated) {
-          if (msg.type === "auth" && msg.account && msg.token) {
-            if (verifyAccountToken(msg.account, msg.token)) {
-              authenticated = true;
-              accountName = msg.account;
-              state.connectAccount(accountName, msg.token);
-              socket.write(JSON.stringify({ type: "auth_ok" }) + "\n");
-            } else {
-              socket.write(JSON.stringify({ type: "auth_fail", error: "Invalid token" }) + "\n");
-              socket.end();
-            }
+    const parser = createLineParser((msg) => {
+      // First message must be auth handshake
+      if (!authenticated) {
+        if (msg.type === "auth" && msg.account && msg.token) {
+          if (verifyAccountToken(msg.account, msg.token)) {
+            authenticated = true;
+            accountName = msg.account;
+            state.connectAccount(accountName, msg.token);
+            socket.write(reply(msg, { type: "auth_ok" }));
+          } else {
+            socket.write(reply(msg, { type: "auth_fail", error: "Invalid token" }));
+            socket.end();
           }
+        }
+        return;
+      }
+
+      // Handle message types
+      if (msg.type === "send_message") {
+        state.addMessage({
+          from: accountName,
+          to: msg.to,
+          type: "message",
+          content: msg.content,
+          timestamp: new Date().toISOString(),
+        });
+        // Fire notification (non-blocking)
+        notifyMessage(accountName, msg.to, msg.content).catch(() => {});
+        socket.write(reply(msg, { type: "result", delivered: state.isConnected(msg.to), queued: true }));
+      }
+
+      if (msg.type === "read_messages") {
+        const limit = msg.limit as number | undefined;
+        const offset = msg.offset as number | undefined;
+        const messages = (limit || offset)
+          ? state.getMessages(accountName, { limit, offset })
+          : state.getUnreadMessages(accountName);
+        if (!limit && !offset) {
+          state.markAllRead(accountName);
+        }
+        socket.write(reply(msg, { type: "result", messages }));
+      }
+
+      if (msg.type === "list_accounts") {
+        const accounts = state.getConnectedAccounts().map((name) => ({
+          name,
+          status: "active" as const,
+        }));
+        socket.write(reply(msg, { type: "result", accounts }));
+      }
+
+      if (msg.type === "handoff_task") {
+        // Server-side validation (bypass protection)
+        const validation = validateHandoff(msg.payload);
+        if (!validation.valid) {
+          socket.write(reply(msg, {
+            type: "error",
+            error: "Invalid handoff payload",
+            details: validation.errors,
+          }));
           return;
         }
 
-        // Handle message types
-        if (msg.type === "send_message") {
-          state.addMessage({
-            from: accountName,
-            to: msg.to,
-            type: "message",
-            content: msg.content,
-            timestamp: new Date().toISOString(),
-          });
-          socket.write(JSON.stringify({ type: "result", delivered: state.isConnected(msg.to), queued: true }) + "\n");
-        }
+        const handoffMsg = {
+          from: accountName,
+          to: msg.to,
+          type: "handoff" as const,
+          content: JSON.stringify(validation.payload),
+          timestamp: new Date().toISOString(),
+          context: msg.context ?? {},
+        };
+        const handoffId = state.addMessage(handoffMsg);
+        // Fire notification (non-blocking)
+        notifyHandoff(accountName, msg.to, validation.payload.goal).catch(() => {});
+        socket.write(reply(msg, {
+          type: "result",
+          delivered: state.isConnected(msg.to),
+          queued: true,
+          handoffId,
+        }));
+      }
 
-        if (msg.type === "read_messages") {
-          const messages = state.getUnreadMessages(accountName);
-          state.markAllRead(accountName);
-          socket.write(JSON.stringify({ type: "result", messages }) + "\n");
-        }
+      if (msg.type === "update_task_status") {
+        (async () => {
+          try {
+            let board = await loadTasks();
+            const status = msg.status as TaskStatus;
 
-        if (msg.type === "list_accounts") {
-          const accounts = state.getConnectedAccounts().map((name) => ({
-            name,
-            status: "active" as const,
-          }));
-          socket.write(JSON.stringify({ type: "result", accounts }) + "\n");
-        }
+            if (status === "rejected") {
+              if (!msg.reason) {
+                socket.write(reply(msg, { type: "error", error: "Reason is required when rejecting" }));
+                return;
+              }
+              board = rejectTask(board, msg.taskId, msg.reason);
+            } else if (status === "accepted") {
+              board = acceptTask(board, msg.taskId);
+            } else {
+              board = updateTaskStatus(board, msg.taskId, status);
+            }
 
-        if (msg.type === "handoff_task") {
-          const handoffMsg = {
-            from: accountName,
-            to: msg.to,
-            type: "handoff" as const,
-            content: msg.task,
-            timestamp: new Date().toISOString(),
-            context: msg.context ?? {},
-          };
-          state.addMessage(handoffMsg);
-          const lastMsg = state.getMessages(msg.to).at(-1);
-          socket.write(JSON.stringify({
-            type: "result",
-            delivered: state.isConnected(msg.to),
-            queued: true,
-            handoffId: lastMsg?.id ?? "",
-          }) + "\n");
-        }
-      } catch { /* ignore malformed messages */ }
+            await saveTasks(board);
+            const task = board.tasks.find((t) => t.id === msg.taskId);
+            socket.write(reply(msg, { type: "result", task }));
+          } catch (err: any) {
+            socket.write(reply(msg, { type: "error", error: err.message }));
+          }
+        })();
+      }
+
+      if (msg.type === "archive_messages") {
+        const archived = state.archiveOld(msg.days);
+        socket.write(reply(msg, { type: "result", archived }));
+      }
     });
+
+    socket.on("data", (data) => parser.feed(data));
 
     socket.on("close", () => {
       if (accountName) state.disconnectAccount(accountName);
@@ -140,6 +180,26 @@ export function stopDaemon(server: Server): void {
   server.close();
   try { unlinkSync(getSockPath()); } catch {}
   try { unlinkSync(getPidPath()); } catch {}
+}
+
+export function daemonStatusCommand(): string {
+  const pidPath = getPidPath();
+  const sockPath = getSockPath();
+
+  try {
+    const pid = parseInt(readFileSync(pidPath, "utf-8").trim(), 10);
+    try {
+      process.kill(pid, 0); // signal 0 = existence check
+      const hasSocket = existsSync(sockPath);
+      return `Daemon running (PID: ${pid}${hasSocket ? ", socket: hub.sock" : ""})`;
+    } catch {
+      // Process not alive -- stale PID file
+      try { unlinkSync(pidPath); } catch {}
+      return "Daemon not running (stale PID file removed)";
+    }
+  } catch {
+    return "Daemon not running";
+  }
 }
 
 export function stopDaemonByPid(): void {

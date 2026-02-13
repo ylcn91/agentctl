@@ -87,7 +87,7 @@ export async function readCheckpointsFromGit(repoDir: string): Promise<EntireChe
 // Fallback: shell out to entire CLI
 export async function readCheckpointsFromCLI(repoDir: string): Promise<EntireCheckpoint[]> {
   try {
-    await $`entire explain --short --no-pager`.cwd(repoDir).quiet().timeout(10_000);
+    await $`entire explain --short --no-pager`.cwd(repoDir).quiet();
     return [];
   } catch {
     return [];
@@ -105,6 +105,15 @@ export async function getEntireCheckpoints(repoDir: string): Promise<EntireCheck
     return await readCheckpointsFromCLI(repoDir);
   } catch {
     return [];
+  }
+}
+
+export async function resumeCheckpoint(repoDir: string, checkpointId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await $`entire resume ${checkpointId}`.cwd(repoDir).quiet();
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
   }
 }
 

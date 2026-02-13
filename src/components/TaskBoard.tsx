@@ -7,7 +7,10 @@ import {
   updateTaskStatus,
   assignTask,
   removeTask,
-  type Task,
+  sortByPriority,
+  rejectTask,
+  acceptTask,
+  VALID_TRANSITIONS,
   type TaskBoard as TaskBoardData,
   type TaskStatus,
 } from "../services/tasks.js";
@@ -17,18 +20,22 @@ interface Props {
   accounts?: string[];
 }
 
-type Mode = "browse" | "add" | "assign";
+type Mode = "browse" | "add" | "assign" | "reject";
 
-const STATUS_ORDER: TaskStatus[] = ["pending", "in-progress", "done"];
+const STATUS_ORDER: TaskStatus[] = ["todo", "in_progress", "ready_for_review", "accepted", "rejected"];
 const STATUS_COLORS: Record<TaskStatus, string> = {
-  "pending": "yellow",
-  "in-progress": "cyan",
-  "done": "green",
+  todo: "yellow",
+  in_progress: "cyan",
+  ready_for_review: "magenta",
+  accepted: "green",
+  rejected: "red",
 };
 const STATUS_LABELS: Record<TaskStatus, string> = {
-  "pending": "Pending",
-  "in-progress": "In Progress",
-  "done": "Done",
+  todo: "To Do",
+  in_progress: "In Progress",
+  ready_for_review: "Ready for Review",
+  accepted: "Accepted",
+  rejected: "Rejected",
 };
 
 export function TaskBoard({ onNavigate, accounts = [] }: Props) {
@@ -38,6 +45,7 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
   const [mode, setMode] = useState<Mode>("browse");
   const [inputBuffer, setInputBuffer] = useState("");
   const [assignIndex, setAssignIndex] = useState(0);
+  const [sortByPrio, setSortByPrio] = useState(false);
 
   useEffect(() => {
     loadTasks().then((b) => {
@@ -51,7 +59,8 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
     allTasks.filter((t) => t.status === status);
 
   // Flat list for navigation: pending, then in-progress, then done
-  const flatTasks = STATUS_ORDER.flatMap((s) => tasksByStatus(s));
+  const rawTasks = STATUS_ORDER.flatMap((s) => tasksByStatus(s));
+  const flatTasks = sortByPrio ? sortByPriority(rawTasks) : rawTasks;
 
   async function persist(newBoard: TaskBoardData) {
     setBoard(newBoard);
@@ -64,6 +73,28 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
         if (inputBuffer.trim()) {
           const newBoard = addTask(board, inputBuffer.trim());
           persist(newBoard);
+        }
+        setInputBuffer("");
+        setMode("browse");
+      } else if (key.escape) {
+        setInputBuffer("");
+        setMode("browse");
+      } else if (key.backspace || key.delete) {
+        setInputBuffer((b) => b.slice(0, -1));
+      } else if (input && !key.ctrl && !key.meta) {
+        setInputBuffer((b) => b + input);
+      }
+      return;
+    }
+
+    if (mode === "reject") {
+      if (key.return) {
+        if (inputBuffer.trim()) {
+          const task = flatTasks[selectedIndex];
+          if (task) {
+            const newBoard = rejectTask(board, task.id, inputBuffer.trim());
+            persist(newBoard);
+          }
         }
         setInputBuffer("");
         setMode("browse");
@@ -114,11 +145,32 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
       persist(newBoard);
       setSelectedIndex((i) => Math.min(i, newBoard.tasks.length - 1));
     } else if (input === "s" && flatTasks[selectedIndex]) {
-      // Cycle status: pending -> in-progress -> done -> pending
+      // Advance through valid transitions only
       const task = flatTasks[selectedIndex];
-      const nextIdx = (STATUS_ORDER.indexOf(task.status) + 1) % STATUS_ORDER.length;
-      const newBoard = updateTaskStatus(board, task.id, STATUS_ORDER[nextIdx]);
-      persist(newBoard);
+      const allowed = VALID_TRANSITIONS[task.status];
+      if (allowed.length > 0) {
+        try {
+          const newBoard = updateTaskStatus(board, task.id, allowed[0]);
+          persist(newBoard);
+        } catch {}
+      }
+    } else if (input === "v" && flatTasks[selectedIndex]) {
+      // Accept task (only valid on ready_for_review)
+      const task = flatTasks[selectedIndex];
+      if (task.status === "ready_for_review") {
+        try {
+          const newBoard = acceptTask(board, task.id);
+          persist(newBoard);
+        } catch {}
+      }
+    } else if (input === "x" && flatTasks[selectedIndex]) {
+      // Reject task (only valid on ready_for_review)
+      const task = flatTasks[selectedIndex];
+      if (task.status === "ready_for_review") {
+        setMode("reject");
+      }
+    } else if (input === "p") {
+      setSortByPrio((prev) => !prev);
     } else if (key.escape) {
       onNavigate("dashboard");
     }
@@ -130,12 +182,21 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>Task Board</Text>
-        <Text color="gray">  [a]dd [s]tatus [Enter]assign [d]elete [Esc]back</Text>
+        {sortByPrio && <Text color="yellow"> (sorted by priority)</Text>}
+        <Text color="gray">  [a]dd [s]tatus [v]accept [x]reject [p]riority [Enter]assign [d]elete [Esc]back</Text>
       </Box>
 
       {mode === "add" && (
         <Box marginBottom={1}>
           <Text color="cyan">New task: </Text>
+          <Text>{inputBuffer}</Text>
+          <Text color="gray">_</Text>
+        </Box>
+      )}
+
+      {mode === "reject" && (
+        <Box marginBottom={1}>
+          <Text color="red">Rejection reason: </Text>
           <Text>{inputBuffer}</Text>
           <Text color="gray">_</Text>
         </Box>
@@ -157,8 +218,15 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
                     {isSelected ? "> " : "  "}
                   </Text>
                   <Text color={isSelected ? "white" : undefined}>
+                    {task.priority && <Text color="red">[{task.priority}] </Text>}
                     {task.title}
                   </Text>
+                  {task.dueDate && (
+                    <Text color="gray"> due:{task.dueDate.slice(0, 10)}</Text>
+                  )}
+                  {task.tags && task.tags.length > 0 && (
+                    <Text color="blue"> #{task.tags.join(" #")}</Text>
+                  )}
                   {task.assignee && (
                     <Text color="magenta"> @{task.assignee}</Text>
                   )}
