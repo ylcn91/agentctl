@@ -7,6 +7,7 @@ import { validateHandoff } from "../services/handoff";
 import { loadTasks, saveTasks, updateTaskStatus, rejectTask, acceptTask, submitForReview, type TaskStatus } from "../services/tasks";
 import { runAcceptanceSuite } from "../services/acceptance-runner";
 import { rankAccounts } from "../services/account-capabilities";
+import { loadConfig } from "../config";
 import { checkStaleTasks, formatEscalationMessage, DEFAULT_SLA_CONFIG } from "../services/sla-engine";
 
 function getHubDir(): string {
@@ -25,7 +26,10 @@ function getTokensDir(): string {
   return `${getHubDir()}/tokens`;
 }
 
+const SAFE_ACCOUNT_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$/;
+
 export function verifyAccountToken(account: string, token: string): boolean {
+  if (!SAFE_ACCOUNT_NAME_RE.test(account)) return false;
   const tokenPath = `${getTokensDir()}/${account}.token`;
   try {
     const stored = readFileSync(tokenPath, "utf-8").trim();
@@ -130,11 +134,25 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
       }
 
       if (msg.type === "list_accounts") {
-        const accounts = state.getConnectedAccounts().map((name) => ({
-          name,
-          status: "active" as const,
-        }));
-        socket.write(reply(msg, { type: "result", accounts }));
+        (async () => {
+          try {
+            const connected = new Set(state.getConnectedAccounts());
+            const config = await loadConfig();
+            const accounts = config.accounts.map((a) => ({
+              name: a.name,
+              status: connected.has(a.name) ? "active" as const : "inactive" as const,
+            }));
+            // Include any connected accounts not in config (shouldn't happen, but be safe)
+            for (const name of connected) {
+              if (!accounts.some((a) => a.name === name)) {
+                accounts.push({ name, status: "active" as const });
+              }
+            }
+            socket.write(reply(msg, { type: "result", accounts }));
+          } catch (err: any) {
+            socket.write(reply(msg, { type: "error", error: err.message }));
+          }
+        })();
       }
 
       if (msg.type === "handoff_task") {

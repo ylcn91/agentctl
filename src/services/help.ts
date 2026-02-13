@@ -171,7 +171,7 @@ function overview(): string {
 
   const tui = chalk.gray(
     "\n  Run " + chalk.white("ch") + " with no arguments to open the interactive TUI.\n" +
-    "  TUI keybindings: [j/k] navigate  [Enter] select  [Tab] switch view  [q] quit"
+    "  TUI views: [d]ashboard [l]auncher [u]sage [a]dd [t]asks [m]ail [e]scalation [r]prompts  [Esc] back  [q] quit"
   );
 
   return `\n${mascot}\n\n${title}\n${body}\n${tui}\n`;

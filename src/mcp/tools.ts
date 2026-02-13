@@ -32,7 +32,7 @@ export function registerTools(server: McpServer, sendToDaemon: DaemonSender, acc
   });
 
   server.registerTool("list_accounts", {
-    description: "List all registered accounts and their status",
+    description: "List all registered accounts with their connection status (active/inactive)",
   }, async () => {
     const result = await sendToDaemon({ type: "list_accounts" });
     return { content: [{ type: "text" as const, text: JSON.stringify(result.accounts ?? []) }] };

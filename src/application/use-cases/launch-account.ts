@@ -71,12 +71,14 @@ export async function launchAccount(
 
   const shellCmd = buildShellCommand(cmd);
 
-  if (opts.noWindow) {
+  const noWindow = opts.noWindow ?? !config.defaults.launchInNewWindow;
+  if (noWindow) {
     return { success: true, shellCmd };
   }
 
-  // Launch in terminal
-  const terminal = terminalRegistry.get(opts.terminalId ?? "wezterm") ?? terminalRegistry.listForPlatform()[0];
+  // Launch in terminal — prefer explicit terminalId, then platform default
+  const terminal = (opts.terminalId ? terminalRegistry.get(opts.terminalId) : undefined)
+    ?? terminalRegistry.listForPlatform()[0];
   if (!terminal) {
     return { success: false, shellCmd, error: "No terminal profile found for this platform" };
   }

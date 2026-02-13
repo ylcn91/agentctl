@@ -40,6 +40,16 @@ function getTokensDir(): string {
     : TOKENS_DIR;
 }
 
+const ACCOUNT_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$/;
+
+export function validateAccountName(name: string): void {
+  if (!ACCOUNT_NAME_RE.test(name)) {
+    throw new Error(
+      `Invalid account name '${name}'. Names must be 1-63 alphanumeric characters, hyphens, or underscores, starting with a letter or digit.`
+    );
+  }
+}
+
 export function generateToken(): string {
   return randomBytes(32).toString("hex");
 }
@@ -48,6 +58,13 @@ export async function setupAccount(opts: SetupAccountOptions): Promise<{
   account: AccountConfig;
   tokenPath: string;
 }> {
+  // 0. Validate name and check for duplicates BEFORE any side effects
+  validateAccountName(opts.name);
+  const config = await loadConfig(opts.configPath);
+  if (config.accounts.some((a) => a.name === opts.name)) {
+    throw new Error(`Account '${opts.name}' already exists`);
+  }
+
   const expandedDir = opts.configDir.replace(/^~/, process.env.HOME ?? "");
 
   // 1. Create config directory
@@ -88,7 +105,6 @@ export async function setupAccount(opts: SetupAccountOptions): Promise<{
     provider: opts.provider ?? "claude-code",
   };
 
-  const config = await loadConfig(opts.configPath);
   const updated = addAccount(config, account);
   await saveConfig(updated, opts.configPath);
 
@@ -120,6 +136,7 @@ export async function rotateToken(
   name: string,
   opts?: { configPath?: string }
 ): Promise<{ newToken: string; tokenPath: string }> {
+  validateAccountName(name);
   const config = await loadConfig(opts?.configPath);
   const account = config.accounts.find((a) => a.name === name);
   if (!account) {
@@ -144,6 +161,7 @@ export async function teardownAccount(
   name: string,
   opts?: { purge?: boolean; configPath?: string }
 ): Promise<void> {
+  validateAccountName(name);
   const config = await loadConfig(opts?.configPath);
   const account = config.accounts.find((a) => a.name === name);
   if (!account) {
