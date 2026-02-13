@@ -1,3 +1,12 @@
+```
+ █████╗   ██╗
+██╔══██╗ ███║
+╚█████╔╝ ╚██║
+ ╚═══██║  ██║
+ █████╔╝  ██║
+ ╚════╝   ╚═╝
+```
+
 # Claude Hub
 
 **Multi-account AI agent manager** — run multiple Claude Code, Codex CLI, OpenHands, and Gemini CLI accounts from a single TUI dashboard with inter-agent messaging, task handoff, SLA monitoring, and capability-based routing.
