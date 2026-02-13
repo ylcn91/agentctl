@@ -76,6 +76,14 @@ if (command === "daemon" && subcommand === "start") {
 } else if (command === "daemon" && subcommand === "stop") {
   const { stopDaemonByPid } = await import("./daemon/server.js");
   stopDaemonByPid();
+} else if (command === "daemon" && subcommand === "supervise") {
+  const { startSupervisor } = await import("./daemon/supervisor.js");
+  const DAEMON_SOCK = `${process.env.CLAUDE_HUB_DIR ?? process.env.HOME + "/.claude-hub"}/hub.sock`;
+  const daemonScript = new URL("./daemon/index.ts", import.meta.url).pathname;
+  const supervisor = startSupervisor({ sockPath: DAEMON_SOCK, daemonScript });
+  console.log("Claude Hub daemon supervisor started");
+  process.on("SIGINT", async () => { await supervisor.stop(); process.exit(0); });
+  process.on("SIGTERM", async () => { await supervisor.stop(); process.exit(0); });
 } else if (command === "add") {
   const name = subcommand;
   if (!name) {

@@ -22,6 +22,16 @@ export interface FeatureFlags {
   autoAcceptance?: boolean;
   capabilityRouting?: boolean;
   slaEngine?: boolean;
+  githubIntegration?: boolean;
+  reviewBundles?: boolean;
+  knowledgeIndex?: boolean;
+  reliability?: boolean;
+}
+
+export interface GitHubConfig {
+  enabled: boolean;
+  defaultOwner?: string;
+  defaultRepo?: string;
 }
 
 export interface HubConfig {
@@ -38,6 +48,7 @@ export interface HubConfig {
     muteList?: string[];
   };
   features?: FeatureFlags;
+  github?: GitHubConfig;
   defaults: {
     launchInNewWindow: boolean;
     quotaPolicy: QuotaPolicyConfig;

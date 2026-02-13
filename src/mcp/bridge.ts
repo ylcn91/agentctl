@@ -100,6 +100,44 @@ export async function startBridge(account: string): Promise<void> {
     daemonSocket.once("error", reject);
   });
 
+  // Reconnection logic for daemon socket
+  let reconnectAttempts = 0;
+  const MAX_RECONNECT = 5;
+
+  daemonSocket.on("close", () => {
+    if (reconnectAttempts >= MAX_RECONNECT) {
+      console.error("[bridge] Max reconnection attempts reached");
+      return;
+    }
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+    reconnectAttempts++;
+    console.error(`[bridge] Connection lost, reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT})`);
+    setTimeout(async () => {
+      try {
+        await ensureDaemonRunning();
+        const newSocket = createConnection(DAEMON_SOCK_PATH);
+        newSocket.once("connect", async () => {
+          try {
+            const token = getToken(account);
+            const resp = await createDaemonSender(newSocket)({ type: "auth", account, token });
+            if (resp.type === "auth_ok") {
+              reconnectAttempts = 0;
+              console.error("[bridge] Reconnected successfully");
+            }
+          } catch (err: any) {
+            console.error("[bridge] Re-auth failed:", err.message);
+          }
+        });
+      } catch (err: any) {
+        console.error("[bridge] Reconnection failed:", err.message);
+      }
+    }, delay);
+  });
+
+  daemonSocket.on("error", (err) => {
+    console.error("[bridge] Socket error:", err.message);
+  });
+
   // Start MCP server on stdio
   const mcpServer = new McpServer(
     { name: "claude-hub", version: "1.0.0" },

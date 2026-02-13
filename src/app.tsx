@@ -10,6 +10,7 @@ import { TaskBoard } from "./components/TaskBoard.js";
 import { MessageInbox } from "./components/MessageInbox.js";
 import { SLABoard } from "./components/SLABoard.js";
 import { PromptLibrary } from "./components/PromptLibrary.js";
+import Analytics from "./components/Analytics.js";
 
 const NAV_KEYS: Record<string, string> = {
   d: "dashboard",
@@ -20,6 +21,7 @@ const NAV_KEYS: Record<string, string> = {
   a: "add",
   e: "sla",
   r: "prompts",
+  n: "analytics",
 };
 
 export function App() {
@@ -51,6 +53,7 @@ export function App() {
       {view === "inbox" && <MessageInbox onNavigate={setView} />}
       {view === "sla" && <SLABoard onNavigate={setView} />}
       {view === "prompts" && <PromptLibrary onNavigate={setView} />}
+      {view === "analytics" && <Analytics onNavigate={setView} />}
     </Box>
   );
 }

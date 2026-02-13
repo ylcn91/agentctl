@@ -342,4 +342,150 @@ export function registerTools(server: McpServer, sendToDaemon: DaemonSender, acc
     }
     return { content: [{ type: "text" as const, text: JSON.stringify(prompt) }] };
   });
+
+  // ── F2: GitHub Integration Tools ──
+
+  server.registerTool("link_to_github", {
+    description: "Link a task to a GitHub issue or PR for automated status sync",
+    inputSchema: {
+      taskId: z.string().describe("Task ID to link"),
+      url: z.string().describe("GitHub issue or PR URL"),
+      externalId: z.string().describe("External ID in format 'owner/repo#123'"),
+      linkType: z.enum(["issue", "pr"]).describe("Link type: issue or PR"),
+    },
+  }, async (args) => {
+    const result = await sendToDaemon({
+      type: "link_task",
+      taskId: args.taskId,
+      url: args.url,
+      externalId: args.externalId,
+      linkType: args.linkType,
+      provider: "github",
+    });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
+
+  server.registerTool("get_task_links", {
+    description: "Get all external links (GitHub issues/PRs) for a task",
+    inputSchema: {
+      taskId: z.string().describe("Task ID"),
+    },
+  }, async (args) => {
+    const result = await sendToDaemon({ type: "get_task_links", taskId: args.taskId });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
+
+  server.registerTool("sync_github_status", {
+    description: "Get the current status of a linked GitHub issue",
+    inputSchema: {
+      owner: z.string().describe("Repository owner"),
+      repo: z.string().describe("Repository name"),
+      issueNumber: z.number().describe("Issue or PR number"),
+    },
+  }, async (args) => {
+    const { getIssueStatus } = await import("../integrations/github.js");
+    const status = await getIssueStatus({
+      owner: args.owner,
+      repo: args.repo,
+      issueNumber: args.issueNumber,
+    });
+    return { content: [{ type: "text" as const, text: JSON.stringify(status) }] };
+  });
+
+  // ── F3: Review Bundle Tools ──
+
+  server.registerTool("get_review_bundle", {
+    description: "Get the review bundle for a task (diff summary, test results, risk notes)",
+    inputSchema: {
+      taskId: z.string().describe("Task ID"),
+    },
+  }, async (args) => {
+    const result = await sendToDaemon({ type: "get_review_bundle", taskId: args.taskId });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
+
+  server.registerTool("generate_review_bundle", {
+    description: "Generate a review bundle for a task with git diff analysis, optional test execution, and risk assessment",
+    inputSchema: {
+      taskId: z.string().describe("Task ID"),
+      workDir: z.string().describe("Working directory path"),
+      branch: z.string().describe("Branch to review"),
+      baseBranch: z.string().optional().describe("Base branch (default: main)"),
+      runCommands: z.array(z.string()).optional().describe("Commands to run for testing"),
+    },
+  }, async (args) => {
+    const result = await sendToDaemon({
+      type: "generate_review_bundle",
+      taskId: args.taskId,
+      workDir: args.workDir,
+      branch: args.branch,
+      baseBranch: args.baseBranch,
+      runCommands: args.runCommands,
+    });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
+
+  // ── F4: Knowledge Index Tools ──
+
+  server.registerTool("search_knowledge", {
+    description: "Search the knowledge index for prompts, handoffs, task events, and notes using full-text search",
+    inputSchema: {
+      query: z.string().describe("Search query"),
+      category: z.enum(["prompt", "handoff", "task_event", "decision_note", "message"]).optional().describe("Filter by category"),
+      limit: z.number().optional().describe("Max results (default 20)"),
+    },
+  }, async (args) => {
+    const result = await sendToDaemon({
+      type: "search_knowledge",
+      query: args.query,
+      category: args.category,
+      limit: args.limit,
+    });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
+
+  server.registerTool("index_note", {
+    description: "Index a note or decision in the knowledge base for future search",
+    inputSchema: {
+      title: z.string().describe("Note title"),
+      content: z.string().describe("Note content"),
+      tags: z.array(z.string()).optional().describe("Tags for categorization"),
+      category: z.enum(["prompt", "handoff", "task_event", "decision_note", "message"]).optional().describe("Category (default: decision_note)"),
+    },
+  }, async (args) => {
+    const result = await sendToDaemon({
+      type: "index_note",
+      title: args.title,
+      content: args.content,
+      tags: args.tags,
+      category: args.category,
+    });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
+
+  // ── F5: Analytics Tools ──
+
+  server.registerTool("get_analytics", {
+    description: "Get operational analytics: cycle times, accept/reject ratios, per-account productivity, SLA violations",
+    inputSchema: {
+      fromDate: z.string().optional().describe("Start date (ISO format)"),
+      toDate: z.string().optional().describe("End date (ISO format)"),
+    },
+  }, async (args) => {
+    const result = await sendToDaemon({
+      type: "get_analytics",
+      fromDate: args.fromDate,
+      toDate: args.toDate,
+    });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
+
+  // ── F6: Daemon Health Tool ──
+
+  server.registerTool("daemon_health", {
+    description: "Get daemon health status: uptime, connections, memory usage, store status",
+  }, async () => {
+    const result = await sendToDaemon({ type: "health_check" });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
 }

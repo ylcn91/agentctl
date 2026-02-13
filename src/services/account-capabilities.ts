@@ -17,7 +17,8 @@ export interface RoutingScore {
 export function scoreAccount(
   capability: AccountCapability,
   requiredSkills: string[],
-  _taskPriority?: "P0" | "P1" | "P2"
+  _taskPriority?: "P0" | "P1" | "P2",
+  workloadModifier?: number
 ): RoutingScore {
   const reasons: string[] = [];
 
@@ -83,7 +84,12 @@ export function scoreAccount(
   }
   reasons.push(`recency: ${Math.round(elapsedMin)}min ago (${recencyPoints}pts)`);
 
-  const score = Math.round(skillPoints + successPoints + speedPoints + recencyPoints);
+  const wlMod = workloadModifier ?? 0;
+  if (wlMod !== 0) {
+    reasons.push(`workload modifier: ${wlMod > 0 ? "+" : ""}${wlMod}pts`);
+  }
+
+  const score = Math.max(0, Math.round(skillPoints + successPoints + speedPoints + recencyPoints + wlMod));
 
   return { accountName: capability.accountName, score, reasons };
 }
@@ -91,11 +97,11 @@ export function scoreAccount(
 export function rankAccounts(
   capabilities: AccountCapability[],
   requiredSkills: string[],
-  opts?: { excludeAccounts?: string[]; priority?: "P0" | "P1" | "P2" }
+  opts?: { excludeAccounts?: string[]; priority?: "P0" | "P1" | "P2"; workload?: Map<string, number> }
 ): RoutingScore[] {
   const excluded = new Set(opts?.excludeAccounts ?? []);
   return capabilities
     .filter((c) => !excluded.has(c.accountName))
-    .map((c) => scoreAccount(c, requiredSkills, opts?.priority))
+    .map((c) => scoreAccount(c, requiredSkills, opts?.priority, opts?.workload?.get(c.accountName)))
     .sort((a, b) => b.score - a.score);
 }

@@ -9,6 +9,9 @@ import { runAcceptanceSuite } from "../services/acceptance-runner";
 import { rankAccounts } from "../services/account-capabilities";
 import { loadConfig } from "../config";
 import { checkStaleTasks, formatEscalationMessage, DEFAULT_SLA_CONFIG } from "../services/sla-engine";
+import { computeWorkloadSnapshots, computeWorkloadModifier } from "../services/workload-metrics";
+import { getHealthStatus } from "./health";
+import { startWatchdog } from "./watchdog";
 
 function getHubDir(): string {
   return process.env.CLAUDE_HUB_DIR ?? `${process.env.HOME}/.claude-hub`;
@@ -47,11 +50,21 @@ export interface DaemonOpts {
   dbPath?: string;
   workspaceDbPath?: string;
   capabilityDbPath?: string;
+  knowledgeDbPath?: string;
   sockPath?: string;
-  features?: { workspaceWorktree?: boolean; autoAcceptance?: boolean; capabilityRouting?: boolean; slaEngine?: boolean };
+  features?: {
+    workspaceWorktree?: boolean;
+    autoAcceptance?: boolean;
+    capabilityRouting?: boolean;
+    slaEngine?: boolean;
+    githubIntegration?: boolean;
+    reviewBundles?: boolean;
+    knowledgeIndex?: boolean;
+    reliability?: boolean;
+  };
 }
 
-export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonState; sockPath: string } {
+export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonState; sockPath: string; watchdog?: { stop: () => void } } {
   const state = new DaemonState(opts?.dbPath);
   const features = opts?.features;
 
@@ -71,6 +84,14 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
         }
       } catch(e: any) { console.error("[sla]", e.message) }
     }, DEFAULT_SLA_CONFIG.checkIntervalMs);
+  }
+  if (features?.knowledgeIndex) {
+    state.initKnowledge(opts?.knowledgeDbPath);
+  }
+
+  let watchdog: { stop: () => void } | undefined;
+  if (features?.reliability) {
+    watchdog = startWatchdog(state, state.startedAt);
   }
 
   mkdirSync(getHubDir(), { recursive: true });
@@ -213,6 +234,28 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
             await saveTasks(board);
             const task = board.tasks.find((t) => t.id === msg.taskId);
 
+            // F2: GitHub integration hooks (non-blocking)
+            if (features?.githubIntegration) {
+              import("../services/integration-hooks").then(({ onTaskStatusChanged }) => {
+                onTaskStatusChanged(msg.taskId, status, { reason: msg.reason }).catch(e =>
+                  console.error("[github]", e.message)
+                );
+              }).catch(e => console.error("[github]", e.message));
+            }
+
+            // F3: Auto-generate review bundle on ready_for_review (non-blocking)
+            if (status === "ready_for_review" && features?.reviewBundles && task?.workspaceContext) {
+              import("../services/review-bundle").then(({ generateReviewBundle }) => {
+                import("../services/review-bundle-store").then(({ saveBundle }) => {
+                  generateReviewBundle({
+                    taskId: msg.taskId,
+                    workDir: task.workspaceContext!.workspacePath,
+                    branch: task.workspaceContext!.branch,
+                  }).then(bundle => saveBundle(bundle)).catch(e => console.error("[review-bundle]", e.message));
+                });
+              }).catch(e => console.error("[review-bundle]", e.message));
+            }
+
             // Auto-acceptance: if transitioning to ready_for_review and feature enabled
             if (status === "ready_for_review" && features?.autoAcceptance && task) {
               socket.write(reply(msg, { type: "result", task, acceptance: "running" }));
@@ -345,19 +388,155 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
         })();
       }
 
-      // ── Routing handler ──
+      // ── Routing handler (F1: workload-aware) ──
       if (msg.type === "suggest_assignee") {
         if (!state.capabilityStore) {
           socket.write(reply(msg, { type: "error", error: "Capability routing not enabled" }));
           return;
         }
-        const capabilities = state.capabilityStore.getAll();
-        const skills: string[] = msg.skills ?? [];
-        const scores = rankAccounts(capabilities, skills, {
-          excludeAccounts: msg.excludeAccounts,
-          priority: msg.priority,
+        (async () => {
+          try {
+            const capabilities = state.capabilityStore!.getAll();
+            const skills: string[] = msg.skills ?? [];
+
+            // F1: Compute workload modifiers
+            let workload: Map<string, number> | undefined;
+            try {
+              const board = await loadTasks();
+              const snapshots = computeWorkloadSnapshots(board);
+              workload = new Map<string, number>();
+              for (const [name, snap] of snapshots) {
+                workload.set(name, computeWorkloadModifier(snap));
+              }
+            } catch { /* workload enrichment is best-effort */ }
+
+            const scores = rankAccounts(capabilities, skills, {
+              excludeAccounts: msg.excludeAccounts,
+              priority: msg.priority,
+              workload,
+            });
+            socket.write(reply(msg, { type: "result", scores }));
+          } catch (err: any) {
+            socket.write(reply(msg, { type: "error", error: err.message }));
+          }
+        })();
+      }
+
+      // ── F6: Ping/pong for health checks ──
+      if (msg.type === "ping") {
+        socket.write(reply(msg, { type: "pong" }));
+      }
+
+      // ── F6: Health check handler ──
+      if (msg.type === "health_check") {
+        const status = getHealthStatus(state, state.startedAt);
+        socket.write(reply(msg, { type: "result", ...status }));
+      }
+
+      // ── F4: Knowledge handlers ──
+      if (msg.type === "search_knowledge") {
+        if (!state.knowledgeStore) {
+          socket.write(reply(msg, { type: "error", error: "Knowledge index not enabled" }));
+          return;
+        }
+        const results = state.knowledgeStore.search(msg.query, msg.category, msg.limit);
+        socket.write(reply(msg, { type: "result", results }));
+      }
+
+      if (msg.type === "index_note") {
+        if (!state.knowledgeStore) {
+          socket.write(reply(msg, { type: "error", error: "Knowledge index not enabled" }));
+          return;
+        }
+        const entry = state.knowledgeStore.index({
+          category: msg.category ?? "decision_note",
+          title: msg.title,
+          content: msg.content,
+          tags: msg.tags ?? [],
+          accountName: accountName,
         });
-        socket.write(reply(msg, { type: "result", scores }));
+        socket.write(reply(msg, { type: "result", entry }));
+      }
+
+      // ── F2: External link handlers ──
+      if (msg.type === "link_task") {
+        (async () => {
+          try {
+            const { addLink } = await import("../services/external-links");
+            const link = await addLink({
+              provider: msg.provider ?? "github",
+              type: msg.linkType ?? "issue",
+              url: msg.url,
+              externalId: msg.externalId,
+              taskId: msg.taskId,
+            });
+            socket.write(reply(msg, { type: "result", link }));
+          } catch (err: any) {
+            socket.write(reply(msg, { type: "error", error: err.message }));
+          }
+        })();
+      }
+
+      if (msg.type === "get_task_links") {
+        (async () => {
+          try {
+            const { getLinksForTask } = await import("../services/external-links");
+            const links = await getLinksForTask(msg.taskId);
+            socket.write(reply(msg, { type: "result", links }));
+          } catch (err: any) {
+            socket.write(reply(msg, { type: "error", error: err.message }));
+          }
+        })();
+      }
+
+      // ── F3: Review bundle handlers ──
+      if (msg.type === "get_review_bundle") {
+        (async () => {
+          try {
+            const { getBundle } = await import("../services/review-bundle-store");
+            const bundle = await getBundle(msg.taskId);
+            socket.write(reply(msg, { type: "result", bundle }));
+          } catch (err: any) {
+            socket.write(reply(msg, { type: "error", error: err.message }));
+          }
+        })();
+      }
+
+      if (msg.type === "generate_review_bundle") {
+        (async () => {
+          try {
+            const { generateReviewBundle } = await import("../services/review-bundle");
+            const { saveBundle } = await import("../services/review-bundle-store");
+            const bundle = await generateReviewBundle({
+              taskId: msg.taskId,
+              workDir: msg.workDir,
+              baseBranch: msg.baseBranch,
+              branch: msg.branch,
+              runCommands: msg.runCommands,
+            });
+            await saveBundle(bundle);
+            socket.write(reply(msg, { type: "result", bundle }));
+          } catch (err: any) {
+            socket.write(reply(msg, { type: "error", error: err.message }));
+          }
+        })();
+      }
+
+      // ── F5: Analytics handler ──
+      if (msg.type === "get_analytics") {
+        (async () => {
+          try {
+            const { computeAnalytics } = await import("../services/analytics");
+            const board = await loadTasks();
+            const snapshot = computeAnalytics(board, {
+              fromDate: msg.fromDate,
+              toDate: msg.toDate,
+            });
+            socket.write(reply(msg, { type: "result", ...snapshot }));
+          } catch (err: any) {
+            socket.write(reply(msg, { type: "error", error: err.message }));
+          }
+        })();
       }
     });
 
@@ -372,10 +551,11 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
     writeFileSync(getPidPath(), String(process.pid));
   });
 
-  return { server, state, sockPath };
+  return { server, state, sockPath, watchdog };
 }
 
-export function stopDaemon(server: Server, sockPath?: string): void {
+export function stopDaemon(server: Server, sockPath?: string, watchdog?: { stop: () => void }): void {
+  watchdog?.stop();
   server.close();
   const sp = sockPath ?? getSockPath();
   try { unlinkSync(sp); } catch {}

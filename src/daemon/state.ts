@@ -2,6 +2,7 @@ import { MessageStore } from "./message-store";
 import { WorkspaceStore } from "./workspace-store";
 import { WorkspaceManager } from "./workspace-manager";
 import { CapabilityStore } from "./capability-store";
+import { KnowledgeStore } from "./knowledge-store";
 
 export interface Message {
   id?: string;
@@ -20,11 +21,18 @@ export class DaemonState {
   workspaceStore?: WorkspaceStore;
   workspaceManager?: WorkspaceManager;
   capabilityStore?: CapabilityStore;
+  knowledgeStore?: KnowledgeStore;
+  startedAt: string = new Date().toISOString();
   slaTimerId?: ReturnType<typeof setInterval>;
   onMessagePersist?: (msg: Message) => Promise<void>;
 
   constructor(dbPath?: string) {
     this.store = new MessageStore(dbPath);
+    this.startedAt = new Date().toISOString();
+  }
+
+  getUptime(): number {
+    return Date.now() - new Date(this.startedAt).getTime();
   }
 
   initWorkspace(dbPath?: string): void {
@@ -35,6 +43,11 @@ export class DaemonState {
 
   initCapabilities(dbPath?: string): void {
     this.capabilityStore = new CapabilityStore(dbPath);
+  }
+
+  initKnowledge(dbPath?: string): void {
+    const path = dbPath ?? `${process.env.CLAUDE_HUB_DIR ?? process.env.HOME + "/.claude-hub"}/knowledge.db`;
+    this.knowledgeStore = new KnowledgeStore(path);
   }
 
   connectAccount(name: string, token: string): void {
@@ -102,6 +115,7 @@ export class DaemonState {
     if (this.slaTimerId) clearInterval(this.slaTimerId);
     this.workspaceStore?.close();
     this.capabilityStore?.close();
+    this.knowledgeStore?.close();
     this.store.close();
   }
 }
