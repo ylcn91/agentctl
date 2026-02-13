@@ -40,7 +40,14 @@ const cli = meow(
 const [command, subcommand] = cli.input;
 
 if (command === "daemon" && subcommand === "start") {
-  await import("./daemon/index.js");
+  const { ensureDaemonRunning } = await import("./mcp/bridge.js");
+  try {
+    await ensureDaemonRunning();
+    console.log("Claude Hub daemon started (background)");
+  } catch (e: any) {
+    console.error(`Failed to start daemon: ${e.message}`);
+    process.exit(1);
+  }
 } else if (command === "daemon" && subcommand === "stop") {
   const { stopDaemonByPid } = await import("./daemon/server.js");
   stopDaemonByPid();
@@ -99,8 +106,13 @@ if (command === "daemon" && subcommand === "start") {
     process.exit(1);
   }
 } else if (command === "bridge" && cli.flags.account) {
-  // MCP bridge - will be connected when mcp/bridge.ts exists
-  console.log(`Bridge mode for account: ${cli.flags.account} (not yet implemented)`);
+  const { startBridge } = await import("./mcp/bridge.js");
+  try {
+    await startBridge(cli.flags.account);
+  } catch (e: any) {
+    console.error(`Bridge error: ${e.message}`);
+    process.exit(1);
+  }
 } else if (command === "status") {
   const { statusCommand } = await import("./services/cli-commands.js");
   console.log(await statusCommand());
