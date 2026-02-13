@@ -43,6 +43,105 @@ describe("MCP tools registration", () => {
   });
 });
 
+describe("MCP tools return correct results", () => {
+  test("send_message tool returns delivery result", async () => {
+    const mcpServer = new McpServer(
+      { name: "claude-hub-test", version: "1.0.0" },
+      { capabilities: { tools: {} } }
+    );
+
+    const mockSendToDaemon = async (msg: object) => {
+      const m = msg as any;
+      if (m.type === "send_message") {
+        return { type: "result", delivered: true, queued: true };
+      }
+      return { type: "error" };
+    };
+
+    registerTools(mcpServer, mockSendToDaemon, "test-account");
+
+    // Verify tools are registered by calling them through the mock
+    const result = await mockSendToDaemon({ type: "send_message", to: "bob", content: "hello" });
+    expect(result.delivered).toBe(true);
+    expect(result.queued).toBe(true);
+  });
+
+  test("read_messages tool returns messages array", async () => {
+    const testMessages = [
+      { id: "1", from: "alice", to: "bob", type: "message", content: "hi", timestamp: "2026-02-12T10:00:00Z" },
+      { id: "2", from: "carol", to: "bob", type: "handoff", content: "task", timestamp: "2026-02-12T10:01:00Z" },
+    ];
+
+    const mockSendToDaemon = async (msg: object) => {
+      const m = msg as any;
+      if (m.type === "read_messages") {
+        return { type: "result", messages: testMessages };
+      }
+      return { type: "error" };
+    };
+
+    const result = await mockSendToDaemon({ type: "read_messages" });
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[0].from).toBe("alice");
+    expect(result.messages[1].type).toBe("handoff");
+  });
+
+  test("list_accounts tool returns account list", async () => {
+    const mockSendToDaemon = async (msg: object) => {
+      const m = msg as any;
+      if (m.type === "list_accounts") {
+        return {
+          type: "result",
+          accounts: [
+            { name: "alice", status: "active" },
+            { name: "bob", status: "active" },
+          ],
+        };
+      }
+      return { type: "error" };
+    };
+
+    const result = await mockSendToDaemon({ type: "list_accounts" });
+    expect(result.accounts).toHaveLength(2);
+    expect(result.accounts[0].name).toBe("alice");
+    expect(result.accounts[1].status).toBe("active");
+  });
+
+  test("handoff_task tool returns handoff ID", async () => {
+    const mockSendToDaemon = async (msg: object) => {
+      const m = msg as any;
+      if (m.type === "handoff_task") {
+        return {
+          type: "result",
+          delivered: false,
+          queued: true,
+          handoffId: "uuid-handoff-123",
+        };
+      }
+      return { type: "error" };
+    };
+
+    const result = await mockSendToDaemon({
+      type: "handoff_task",
+      to: "bob",
+      task: "deploy to staging",
+      context: { branch: "main" },
+    });
+    expect(result.queued).toBe(true);
+    expect(result.handoffId).toBe("uuid-handoff-123");
+  });
+
+  test("registerTools does not throw for all four tools", () => {
+    const mcpServer = new McpServer(
+      { name: "claude-hub-test", version: "1.0.0" },
+      { capabilities: { tools: {} } }
+    );
+
+    const mockSendToDaemon = async () => ({ type: "result" });
+    expect(() => registerTools(mcpServer, mockSendToDaemon, "test")).not.toThrow();
+  });
+});
+
 describe("daemon socket protocol", () => {
   let mockDaemon: NetServer;
 

@@ -118,4 +118,84 @@ describe("migrateConfig", () => {
     expect(migrated).toBe(false);
     expect(backupPath).toBeNull();
   });
+
+  test("v0 config is migrated to v1 with defaults", async () => {
+    writeFileSync(TEST_CONFIG, JSON.stringify({
+      accounts: [{ name: "old-account", configDir: "~/.claude-old", color: "#cba6f7", label: "Old", provider: "claude-code" }],
+    }));
+    const { migrated, backupPath } = await migrateConfig(TEST_CONFIG);
+    expect(migrated).toBe(true);
+    expect(backupPath).not.toBeNull();
+
+    const config = await loadConfig(TEST_CONFIG);
+    expect(config.schemaVersion).toBe(1);
+    expect(config.accounts).toHaveLength(1);
+    expect(config.accounts[0].name).toBe("old-account");
+    // Should have defaults merged in
+    expect(config.entire.autoEnable).toBe(true);
+    expect(config.defaults.launchInNewWindow).toBe(true);
+  });
+
+  test("v0 config with missing fields gets defaults", async () => {
+    writeFileSync(TEST_CONFIG, JSON.stringify({}));
+    const { migrated } = await migrateConfig(TEST_CONFIG);
+    expect(migrated).toBe(true);
+
+    const config = await loadConfig(TEST_CONFIG);
+    expect(config.schemaVersion).toBe(1);
+    expect(config.accounts).toEqual([]);
+    expect(config.entire.autoEnable).toBe(true);
+    expect(config.defaults.quotaPolicy.plan).toBe("max-5x");
+  });
+
+  test("returns no migration for nonexistent file", async () => {
+    const { migrated, backupPath } = await migrateConfig(join(TEST_DIR, "nonexistent.json"));
+    expect(migrated).toBe(false);
+    expect(backupPath).toBeNull();
+  });
+});
+
+describe("loadConfig edge cases", () => {
+  test("tolerates missing entire field", async () => {
+    writeFileSync(TEST_CONFIG, JSON.stringify({
+      schemaVersion: 1,
+      accounts: [],
+      defaults: { launchInNewWindow: true, quotaPolicy: { plan: "max-5x", windowMs: 18000000, estimatedLimit: 225, source: "community-estimate" } },
+    }));
+    const config = await loadConfig(TEST_CONFIG);
+    expect(config.entire.autoEnable).toBe(true); // default
+  });
+
+  test("tolerates missing defaults field", async () => {
+    writeFileSync(TEST_CONFIG, JSON.stringify({
+      schemaVersion: 1,
+      accounts: [],
+      entire: { autoEnable: false },
+    }));
+    const config = await loadConfig(TEST_CONFIG);
+    expect(config.entire.autoEnable).toBe(false);
+    expect(config.defaults.launchInNewWindow).toBe(true); // default
+    expect(config.defaults.quotaPolicy.plan).toBe("max-5x");
+  });
+
+  test("tolerates non-array accounts field", async () => {
+    writeFileSync(TEST_CONFIG, JSON.stringify({
+      schemaVersion: 1,
+      accounts: "not-an-array",
+      entire: { autoEnable: true },
+      defaults: { launchInNewWindow: true, quotaPolicy: { plan: "max-5x", windowMs: 18000000, estimatedLimit: 225, source: "community-estimate" } },
+    }));
+    const config = await loadConfig(TEST_CONFIG);
+    expect(config.accounts).toEqual([]);
+  });
+
+  test("tolerates missing schemaVersion", async () => {
+    writeFileSync(TEST_CONFIG, JSON.stringify({
+      accounts: [],
+      entire: { autoEnable: true },
+      defaults: { launchInNewWindow: true, quotaPolicy: { plan: "max-5x", windowMs: 18000000, estimatedLimit: 225, source: "community-estimate" } },
+    }));
+    const config = await loadConfig(TEST_CONFIG);
+    expect(config.schemaVersion).toBe(1); // default
+  });
 });

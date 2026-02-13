@@ -70,3 +70,120 @@ describe("DaemonState", () => {
     expect(state.getMessages("b")[0].content).toBe("for b");
   });
 });
+
+describe("DaemonState message routing", () => {
+  test("message from account A arrives at account B", () => {
+    const state = new DaemonState();
+    state.addMessage({
+      from: "account-a",
+      to: "account-b",
+      type: "message",
+      content: "Task update from A",
+      timestamp: new Date().toISOString(),
+    });
+
+    const msgsForB = state.getMessages("account-b");
+    expect(msgsForB).toHaveLength(1);
+    expect(msgsForB[0].from).toBe("account-a");
+    expect(msgsForB[0].content).toBe("Task update from A");
+
+    // Account A should not see this message
+    const msgsForA = state.getMessages("account-a");
+    expect(msgsForA).toHaveLength(0);
+  });
+
+  test("multiple messages from A to B arrive in order", () => {
+    const state = new DaemonState();
+    state.addMessage({ from: "a", to: "b", type: "message", content: "first", timestamp: "2026-02-12T10:00:00Z" });
+    state.addMessage({ from: "a", to: "b", type: "message", content: "second", timestamp: "2026-02-12T10:01:00Z" });
+    state.addMessage({ from: "a", to: "b", type: "message", content: "third", timestamp: "2026-02-12T10:02:00Z" });
+
+    const msgs = state.getMessages("b");
+    expect(msgs).toHaveLength(3);
+    expect(msgs[0].content).toBe("first");
+    expect(msgs[1].content).toBe("second");
+    expect(msgs[2].content).toBe("third");
+  });
+
+  test("bidirectional messages between A and B", () => {
+    const state = new DaemonState();
+    state.addMessage({ from: "a", to: "b", type: "message", content: "hello b", timestamp: new Date().toISOString() });
+    state.addMessage({ from: "b", to: "a", type: "message", content: "hello a", timestamp: new Date().toISOString() });
+
+    expect(state.getMessages("b")).toHaveLength(1);
+    expect(state.getMessages("b")[0].content).toBe("hello b");
+    expect(state.getMessages("a")).toHaveLength(1);
+    expect(state.getMessages("a")[0].content).toBe("hello a");
+  });
+
+  test("unread tracking works across multiple recipients", () => {
+    const state = new DaemonState();
+    state.addMessage({ from: "sender", to: "user-a", type: "message", content: "msg for a", timestamp: new Date().toISOString() });
+    state.addMessage({ from: "sender", to: "user-b", type: "message", content: "msg for b", timestamp: new Date().toISOString() });
+    state.addMessage({ from: "sender", to: "user-a", type: "message", content: "another for a", timestamp: new Date().toISOString() });
+
+    expect(state.getUnreadMessages("user-a")).toHaveLength(2);
+    expect(state.getUnreadMessages("user-b")).toHaveLength(1);
+
+    // Mark A as read - B should still have unread
+    state.markAllRead("user-a");
+    expect(state.getUnreadMessages("user-a")).toHaveLength(0);
+    expect(state.getUnreadMessages("user-b")).toHaveLength(1);
+  });
+
+  test("markAllRead only affects the specified recipient", () => {
+    const state = new DaemonState();
+    state.addMessage({ from: "x", to: "y", type: "message", content: "for y", timestamp: new Date().toISOString() });
+    state.addMessage({ from: "x", to: "z", type: "message", content: "for z", timestamp: new Date().toISOString() });
+
+    state.markAllRead("y");
+
+    expect(state.getUnreadMessages("y")).toHaveLength(0);
+    expect(state.getUnreadMessages("z")).toHaveLength(1);
+    // All messages still accessible via getMessages
+    expect(state.getMessages("y")).toHaveLength(1);
+  });
+
+  test("markAllRead is idempotent", () => {
+    const state = new DaemonState();
+    state.addMessage({ from: "a", to: "b", type: "message", content: "msg", timestamp: new Date().toISOString() });
+
+    state.markAllRead("b");
+    state.markAllRead("b"); // second call should not error
+    expect(state.getUnreadMessages("b")).toHaveLength(0);
+  });
+
+  test("handoff messages are included in getMessages but filtered by getHandoffs", () => {
+    const state = new DaemonState();
+    state.addMessage({ from: "a", to: "b", type: "message", content: "regular", timestamp: new Date().toISOString() });
+    state.addMessage({ from: "a", to: "b", type: "handoff", content: "handoff task", timestamp: new Date().toISOString(), context: { branch: "main" } });
+
+    expect(state.getMessages("b")).toHaveLength(2);
+    expect(state.getHandoffs("b")).toHaveLength(1);
+    expect(state.getHandoffs("b")[0].content).toBe("handoff task");
+  });
+
+  test("disconnected account messages are still queued", () => {
+    const state = new DaemonState();
+    // Account C is not connected but messages are still stored
+    state.addMessage({ from: "a", to: "c", type: "message", content: "queued for c", timestamp: new Date().toISOString() });
+
+    expect(state.isConnected("c")).toBe(false);
+    expect(state.getMessages("c")).toHaveLength(1);
+    expect(state.getUnreadMessages("c")).toHaveLength(1);
+  });
+
+  test("messages from multiple senders to same recipient", () => {
+    const state = new DaemonState();
+    state.addMessage({ from: "sender-1", to: "receiver", type: "message", content: "from 1", timestamp: new Date().toISOString() });
+    state.addMessage({ from: "sender-2", to: "receiver", type: "message", content: "from 2", timestamp: new Date().toISOString() });
+    state.addMessage({ from: "sender-3", to: "receiver", type: "message", content: "from 3", timestamp: new Date().toISOString() });
+
+    const msgs = state.getMessages("receiver");
+    expect(msgs).toHaveLength(3);
+    const senders = msgs.map(m => m.from);
+    expect(senders).toContain("sender-1");
+    expect(senders).toContain("sender-2");
+    expect(senders).toContain("sender-3");
+  });
+});
