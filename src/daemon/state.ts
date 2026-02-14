@@ -7,12 +7,14 @@ import { ExternalLinkStore } from "../services/external-links";
 import { ActivityStore } from "../services/activity-store";
 import { WorkflowStore } from "../services/workflow-store";
 import { WorkflowEngine } from "../services/workflow-engine";
-import { getKnowledgeDbPath, getActivityDbPath, getWorkflowDbPath, getRetroDbPath, getSessionsDbPath } from "../paths";
+import { getKnowledgeDbPath, getActivityDbPath, getWorkflowDbPath, getRetroDbPath, getSessionsDbPath, getTrustDbPath } from "../paths";
 import { SessionStore } from "./session-store";
 import { RetroStore } from "../services/retro-store";
 import { RetroEngine } from "../services/retro-engine";
 import { SharedSessionManager } from "./shared-session";
 import { HealthMonitor } from "./health-monitor";
+import { TrustStore } from "./trust-store";
+import { EventBus } from "../services/event-bus";
 
 export interface Message {
   id?: string;
@@ -39,6 +41,8 @@ export class DaemonState {
   retroStore?: RetroStore;
   retroEngine?: RetroEngine;
   sessionStore?: SessionStore;
+  trustStore?: TrustStore;
+  eventBus = new EventBus();
   sharedSessionManager = new SharedSessionManager();
   healthMonitor = new HealthMonitor();
   startedAt: string = new Date().toISOString();
@@ -87,6 +91,11 @@ export class DaemonState {
   initSessions(dbPath?: string): void {
     const path = dbPath ?? getSessionsDbPath();
     this.sessionStore = new SessionStore(path);
+  }
+
+  initTrust(dbPath?: string): void {
+    const path = dbPath ?? getTrustDbPath();
+    this.trustStore = new TrustStore(path);
   }
 
   initRetro(dbPath?: string): void {
@@ -173,6 +182,7 @@ export class DaemonState {
       this.workflowStore,
       this.retroStore,
       this.sessionStore,
+      this.trustStore,
       this.store,
     ];
     for (const s of stores) {

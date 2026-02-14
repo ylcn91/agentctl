@@ -83,3 +83,7 @@ export function getRetroDbPath(): string {
 export function getSessionsDbPath(): string {
   return `${getHubDir()}/sessions.db`;
 }
+
+export function getTrustDbPath(): string {
+  return `${getHubDir()}/trust.db`;
+}

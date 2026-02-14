@@ -62,7 +62,7 @@ export function registerTools(server: McpServer, sendToDaemon: DaemonSender, acc
   });
 
   server.registerTool("handoff_task", {
-    description: "Hand off a task to another Claude Code account with a structured contract (goal, acceptance criteria, run commands, blockers). The task is persisted and delivered when the target account connects.",
+    description: "Hand off a task to another account with a structured contract. Supports enriched task characteristics (complexity, criticality, verifiability, etc.) for intelligent delegation routing.",
     inputSchema: {
       to: z.string().describe("Target account name"),
       goal: z.string().describe("What the task should accomplish"),
@@ -72,6 +72,16 @@ export function registerTools(server: McpServer, sendToDaemon: DaemonSender, acc
       branch: z.string().optional().describe("Git branch for context"),
       projectDir: z.string().optional().describe("Project directory path"),
       notes: z.string().optional().describe("Additional notes or context"),
+      // Enriched task characteristics (Paper §2.2)
+      complexity: z.enum(["low", "medium", "high", "critical"]).optional().describe("Task complexity level"),
+      criticality: z.enum(["low", "medium", "high", "critical"]).optional().describe("How critical the task is"),
+      uncertainty: z.enum(["low", "medium", "high"]).optional().describe("Level of uncertainty in requirements"),
+      estimated_duration_minutes: z.number().min(0).optional().describe("Estimated duration in minutes"),
+      verifiability: z.enum(["auto-testable", "needs-review", "subjective"]).optional().describe("How the outcome can be verified"),
+      reversibility: z.enum(["reversible", "partial", "irreversible"]).optional().describe("Can the changes be reverted?"),
+      required_skills: z.array(z.string()).optional().describe("Skills needed for this task"),
+      autonomy_level: z.enum(["strict", "standard", "open-ended"]).optional().describe("Level of autonomy for the delegatee"),
+      monitoring_level: z.enum(["outcome-only", "periodic", "continuous"]).optional().describe("How closely to monitor progress"),
     },
   }, async (args) => {
     const validation = validateHandoff({
@@ -79,6 +89,15 @@ export function registerTools(server: McpServer, sendToDaemon: DaemonSender, acc
       acceptance_criteria: args.acceptance_criteria,
       run_commands: args.run_commands,
       blocked_by: args.blocked_by,
+      complexity: args.complexity,
+      criticality: args.criticality,
+      uncertainty: args.uncertainty,
+      estimated_duration_minutes: args.estimated_duration_minutes,
+      verifiability: args.verifiability,
+      reversibility: args.reversibility,
+      required_skills: args.required_skills,
+      autonomy_level: args.autonomy_level,
+      monitoring_level: args.monitoring_level,
     });
     if (!validation.valid) {
       return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Invalid handoff payload", details: validation.errors }) }] };
@@ -572,7 +591,7 @@ export function registerTools(server: McpServer, sendToDaemon: DaemonSender, acc
       whatWentWell: z.array(z.string()).describe("Things that went well"),
       whatDidntWork: z.array(z.string()).describe("Things that didn't work"),
       suggestions: z.array(z.string()).describe("Suggestions for improvement"),
-      agentPerformanceNotes: z.record(z.string()).optional().describe("Per-agent performance notes"),
+      agentPerformanceNotes: z.record(z.string(), z.string()).optional().describe("Per-agent performance notes"),
     },
   }, async (args) => {
     const result = await sendToDaemon({

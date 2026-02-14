@@ -29,6 +29,7 @@ export interface FeatureFlags {
   workflow?: boolean;
   retro?: boolean;
   sessions?: boolean;
+  trust?: boolean;
 }
 
 export interface GitHubConfig {

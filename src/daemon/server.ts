@@ -56,6 +56,7 @@ export interface DaemonOpts {
   workflowDbPath?: string;
   retroDbPath?: string;
   sessionsDbPath?: string;
+  trustDbPath?: string;
   sockPath?: string;
   features?: {
     workspaceWorktree?: boolean;
@@ -69,6 +70,7 @@ export interface DaemonOpts {
     workflow?: boolean;
     retro?: boolean;
     sessions?: boolean;
+    trust?: boolean;
   };
 }
 
@@ -111,6 +113,9 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
   }
   if (features?.sessions) {
     state.initSessions(opts?.sessionsDbPath);
+  }
+  if (features?.trust) {
+    state.initTrust(opts?.trustDbPath);
   }
 
   let watchdog: { stop: () => void } | undefined;

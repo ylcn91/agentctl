@@ -8,7 +8,13 @@ export type ActivityEventType =
   | "workflow_started" | "workflow_step_completed" | "workflow_completed"
   | "retro_started" | "retro_completed"
   | "github_issue_created" | "github_comment_added"
-  | "acceptance_passed" | "acceptance_failed";
+  | "acceptance_passed" | "acceptance_failed"
+  // F-02: Delegation lifecycle events (Paper §4.5)
+  | "task_assigned" | "task_started" | "task_completed"
+  | "checkpoint_reached" | "progress_update"
+  | "sla_warning" | "sla_breach"
+  | "task_verified" | "reassignment"
+  | "trust_update" | "delegation_chain";
 
 export interface ActivityEvent {
   id: string;
@@ -59,7 +65,7 @@ export class ActivityStore extends BaseStore {
 
   query(opts: { type?: string; account?: string; workflowRunId?: string; since?: string; limit?: number }): ActivityEvent[] {
     let sql = "SELECT * FROM activity WHERE 1=1";
-    const params: unknown[] = [];
+    const params: (string | number | null)[] = [];
     if (opts.type) { sql += " AND type = ?"; params.push(opts.type); }
     if (opts.account) { sql += " AND account = ?"; params.push(opts.account); }
     if (opts.workflowRunId) { sql += " AND workflow_run_id = ?"; params.push(opts.workflowRunId); }
