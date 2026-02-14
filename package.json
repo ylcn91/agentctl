@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "bin": {
-    "ac": "./src/cli.tsx"
+    "agentctl": "./src/cli.tsx",
+    "actl": "./src/cli.tsx"
   },
   "devDependencies": {
     "@types/bun": "^1.3.9",

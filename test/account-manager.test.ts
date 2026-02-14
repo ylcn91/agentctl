@@ -134,7 +134,7 @@ describe("setupAccount", () => {
     const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
     expect(settings.mcpServers).toBeDefined();
     expect(settings.mcpServers["agentctl"]).toEqual({
-      command: "ac",
+      command: "actl",
       args: ["bridge", "--account", "mcp-test"],
     });
   });

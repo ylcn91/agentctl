@@ -8,4 +8,4 @@ const { server, watchdog } = startDaemon({ features: config.features });
 process.on("SIGINT", () => { stopDaemon(server, undefined, watchdog); process.exit(0); });
 process.on("SIGTERM", () => { stopDaemon(server, undefined, watchdog); process.exit(0); });
 
-console.log(`Claude Hub daemon started${isSupervised ? " (supervised)" : ""}`);
+console.log(`agentctl daemon started${isSupervised ? " (supervised)" : ""}`);

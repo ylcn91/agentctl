@@ -21,7 +21,7 @@ function App() {
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Text bold color="magenta">Claude Hub PoC</Text>
+      <Text bold color="magenta">agentctl PoC</Text>
       <Text>{status}</Text>
     </Box>
   );

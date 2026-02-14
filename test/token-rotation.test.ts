@@ -82,7 +82,7 @@ describe("rotateToken", () => {
     // settings.json should now have the MCP config restored
     const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
     expect(settings.mcpServers["agentctl"]).toEqual({
-      command: "ac",
+      command: "actl",
       args: ["bridge", "--account", "settings-test"],
     });
   });

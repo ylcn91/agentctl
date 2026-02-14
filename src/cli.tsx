@@ -68,7 +68,7 @@ if (command === "daemon" && subcommand === "start") {
   const { ensureDaemonRunning } = await import("./mcp/bridge.js");
   try {
     await ensureDaemonRunning();
-    console.log("Claude Hub daemon started (background)");
+    console.log("agentctl daemon started (background)");
   } catch (e: any) {
     console.error(`Failed to start daemon: ${e.message}`);
     process.exit(1);
@@ -85,7 +85,7 @@ if (command === "daemon" && subcommand === "start") {
   const DAEMON_SOCK = getSockPath();
   const daemonScript = new URL("./daemon/index.ts", import.meta.url).pathname;
   const supervisor = startSupervisor({ sockPath: DAEMON_SOCK, daemonScript });
-  console.log("Claude Hub daemon supervisor started");
+  console.log("agentctl daemon supervisor started");
   process.on("SIGINT", async () => { await supervisor.stop(); process.exit(0); });
   process.on("SIGTERM", async () => { await supervisor.stop(); process.exit(0); });
 } else if (command === "add") {

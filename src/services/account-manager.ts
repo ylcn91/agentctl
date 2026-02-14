@@ -122,7 +122,7 @@ async function setupMCPConfig(configDir: string, accountName: string): Promise<v
 
   if (!settings.mcpServers) settings.mcpServers = {};
   settings.mcpServers["agentctl"] = {
-    command: "ac",
+    command: "actl",
     args: ["bridge", "--account", accountName],
   };
 

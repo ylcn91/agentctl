@@ -10,7 +10,7 @@ describe("OpenCodeProvider", () => {
   test("has correct id and displayName", () => {
     expect(provider.id).toBe("opencode");
     expect(provider.displayName).toBe("OpenCode");
-    expect(provider.icon).toBe("⌨");
+    expect(provider.icon).toBe("🔓");
     expect(provider.supportsEntire).toBe(false);
   });
 
@@ -92,7 +92,7 @@ describe("CursorAgentProvider", () => {
   test("has correct id and displayName", () => {
     expect(provider.id).toBe("cursor-agent");
     expect(provider.displayName).toBe("Cursor Agent");
-    expect(provider.icon).toBe("▶");
+    expect(provider.icon).toBe("🎯");
     expect(provider.supportsEntire).toBe(false);
   });
 

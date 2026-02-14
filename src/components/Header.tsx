@@ -39,13 +39,13 @@ export function Header({ view, showMascot }: { view: string; showMascot?: boolea
             ))}
           </Box>
           <Box flexDirection="column" justifyContent="center">
-            <Text bold color="#cba6f7">Claude Hub</Text>
+            <Text bold color="#cba6f7">agentctl</Text>
             <Text color="gray">Multi-account AI agent manager</Text>
           </Box>
         </Box>
       )}
       <Box borderStyle="round" borderColor="magenta" paddingX={1}>
-        <Text bold color="magenta">Claude Hub</Text>
+        <Text bold color="magenta">agentctl</Text>
         <Text> | </Text>
         <Text color={view === "dashboard" ? "cyan" : "gray"}>[d]ash</Text>
         <Text> </Text>

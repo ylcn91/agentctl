@@ -88,7 +88,7 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
         const board = await loadTasks();
         const escalations = checkStaleTasks(board.tasks, DEFAULT_SLA_CONFIG);
         for (const esc of escalations) {
-          sendNotification("Claude Hub SLA", formatEscalationMessage(esc)).catch(e => console.error("[sla]", e.message));
+          sendNotification("agentctl SLA", formatEscalationMessage(esc)).catch(e => console.error("[sla]", e.message));
         }
       } catch(e: any) { console.error("[sla]", e.message) }
     }, DEFAULT_SLA_CONFIG.checkIntervalMs);

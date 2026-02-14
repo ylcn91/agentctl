@@ -1,111 +1,60 @@
----
-description: Use Bun instead of Node.js, npm, pnpm, or vite.
-globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
-alwaysApply: false
----
+# agentctl
 
-Default to using Bun instead of Node.js.
+Multi-account AI agent manager — TUI dashboard, inter-agent messaging, task handoff, MCP bridge.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+## Commands
 
-## APIs
+```bash
+bun install && bun link       # install deps + register `actl` CLI globally
+bun test                      # run all 60+ test files
+bun test test/<name>.test.ts  # run a single test file
+actl                          # launch TUI dashboard
+actl daemon start             # start Unix socket daemon (required for messaging/handoff)
+actl bridge --account <name>  # start MCP bridge for an account
+```
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+## Bun
+
+- Use `bun` everywhere — not node, npm, npx, jest, vite, or webpack
+- Use `Bun.file()` over node:fs readFile/writeFile
+- Bun auto-loads .env — don't use dotenv
+- Tests use `import { test, expect } from "bun:test"`
+
+## Architecture
+
+CLI (meow) → TUI (Ink/React) → Services → Daemon (Unix socket) → MCP bridge
+
+Key directories:
+- `src/cli.tsx` — CLI entry point & command router
+- `src/app.tsx` — TUI root (Ink)
+- `src/components/` — Dashboard, TaskBoard, MessageInbox, SLABoard, etc.
+- `src/daemon/` — Unix socket server, state, framing, workspace-manager
+- `src/mcp/` — MCP bridge + 21 tool registrations
+- `src/services/` — Business logic (account-manager, tasks, handoff, sla, workflows, etc.)
+- `src/providers/` — claude-code, codex-cli, openhands, gemini-cli
+- `src/terminals/` — WezTerm, iTerm2, GNOME, Windows Terminal
+- `src/types.ts` — Shared types, constants, path re-exports
+- `test/` — All test files (flat, named `<module>.test.ts`)
+
+## Code Patterns
+
+- **File store**: `src/services/file-store.ts` provides `atomicWrite`/`atomicRead` with advisory locking — use for all JSON persistence
+- **Config**: `src/config.ts` validates with Zod schemas, uses `loadConfig()`/`saveConfig()` — never read config JSON directly
+- **Daemon protocol**: Newline-delimited JSON over Unix socket. First message must be `auth` with account+token. See `src/daemon/framing.ts`
+- **Feature flags**: Gated via `config.features?.flagName` (see `FeatureFlags` in types.ts). Check before using: workspace, autoAcceptance, capabilityRouting, slaEngine, workflow, retro, etc.
+- **Paths**: All file paths computed in `src/paths.ts`. Override base dir with `AGENTCTL_DIR` env var
+- **Task lifecycle**: `todo → in_progress → ready_for_review → accepted/rejected`. Enforced transitions in `src/services/tasks.ts`
 
 ## Testing
 
-Use `bun test` to run tests.
+- Tests are in `test/` (flat directory, not nested under src)
+- Tests mock file I/O and daemon connections — no real filesystem or socket needed
+- Use `import { test, expect, describe, beforeEach, mock } from "bun:test"`
+- Mock pattern: `mock.module("../src/services/file-store", () => ({ atomicRead: ..., atomicWrite: ... }))`
 
-```ts#index.test.ts
-import { test, expect } from "bun:test";
+## Gotchas
 
-test("hello world", () => {
-  expect(1).toBe(1);
-});
-```
-
-## Frontend
-
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+- CLI help text still says `ch` in places (old name: agentctl) — the binary is `actl`/`agentctl`
+- `execa` is a dependency used only in `src/poc.tsx` — prefer `Bun.$` for new shell commands
+- Config lives at `~/.agentctl/config.json`, socket at `~/.agentctl/hub.sock`
+- Account tokens are per-file at `~/.agentctl/tokens/<name>.token` — verified with `timingSafeEqual`

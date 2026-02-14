@@ -12,10 +12,10 @@
 **Multi-account AI agent manager** — run multiple Claude Code, Codex CLI, OpenHands, and Gemini CLI accounts from a single TUI dashboard with inter-agent messaging, task handoff, SLA monitoring, and capability-based routing.
 
 ```
-ac                          # launch TUI dashboard
-ac add work                 # add a new account
-ac launch work ~/project    # open in a new terminal
-ac daemon start             # enable inter-agent communication
+actl                          # launch TUI dashboard
+actl add work                 # add a new account
+actl launch work ~/project    # open in a new terminal
+actl daemon start             # enable inter-agent communication
 ```
 
 ---
@@ -47,21 +47,21 @@ bun install
 bun link
 
 # Add your first account
-ac add work
+actl add work
 
 # Start the daemon (enables messaging & handoff)
-ac daemon start
+actl daemon start
 
 # Launch the TUI
-ac
+actl
 ```
 
 ### Adding accounts
 
 ```bash
-ac add work                                    # defaults to claude-code provider
-ac add codex --provider codex-cli              # use Codex CLI
-ac add review --color "#f38ba8" --label "Code Review"
+actl add work                                    # defaults to claude-code provider
+actl add codex --provider codex-cli              # use Codex CLI
+actl add review --color "#f38ba8" --label "Code Review"
 ```
 
 Each account gets:
@@ -77,14 +77,14 @@ Each account gets:
 
 | Command | Description |
 |---------|-------------|
-| `ac add <name>` | Add new account |
-| `ac remove <name>` | Remove account |
-| `ac rotate-token <name>` | Rotate account token |
-| `ac list` | List all accounts |
-| `ac status` | Show account status and quota |
-| `ac usage` | Detailed usage table |
+| `actl add <name>` | Add new account |
+| `actl remove <name>` | Remove account |
+| `actl rotate-token <name>` | Rotate account token |
+| `actl list` | List all accounts |
+| `actl status` | Show account status and quota |
+| `actl usage` | Detailed usage table |
 
-#### `ac add` flags
+#### `actl add` flags
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -93,7 +93,7 @@ Each account gets:
 | `--label` | Display label | Capitalized name |
 | `--provider` | Provider type | `claude-code` |
 
-#### `ac remove` flags
+#### `actl remove` flags
 
 | Flag | Description |
 |------|-------------|
@@ -102,7 +102,7 @@ Each account gets:
 ### Launch
 
 ```bash
-ac launch <name> [dir] [flags]
+actl launch <name> [dir] [flags]
 ```
 
 | Flag | Description |
@@ -116,35 +116,35 @@ ac launch <name> [dir] [flags]
 
 | Command | Description |
 |---------|-------------|
-| `ac daemon start` | Start agentctl daemon (background) |
-| `ac daemon stop` | Stop the daemon |
-| `ac daemon status` | Check if daemon is running |
+| `actl daemon start` | Start agentctl daemon (background) |
+| `actl daemon stop` | Stop the daemon |
+| `actl daemon status` | Check if daemon is running |
 
 ### Configuration
 
 ```bash
-ac config set <dot.path> <value>
+actl config set <dot.path> <value>
 ```
 
 ```bash
-ac config set notifications.enabled true
-ac config set notifications.events.rateLimit false
-ac config set defaults.launchInNewWindow false
+actl config set notifications.enabled true
+actl config set notifications.events.rateLimit false
+actl config set defaults.launchInNewWindow false
 ```
 
 ### Help
 
 ```bash
-ac help              # overview of all commands
-ac help launch       # detailed help for a command
-ac help daemon
+actl help              # overview of all commands
+actl help launch       # detailed help for a command
+actl help daemon
 ```
 
 ---
 
 ## TUI Dashboard
 
-Run `ac` with no arguments to open the interactive dashboard.
+Run `actl` with no arguments to open the interactive dashboard.
 
 ### Views
 
@@ -175,7 +175,7 @@ Run `ac` with no arguments to open the interactive dashboard.
 The MCP bridge exposes 21 tools that AI agents can use to communicate with agentctl. Start the bridge per-account:
 
 ```bash
-ac bridge --account work
+actl bridge --account work
 ```
 
 ### Messaging
@@ -267,9 +267,9 @@ The daemon uses newline-delimited JSON over a Unix socket. The first message fro
 ### Start / Stop
 
 ```bash
-ac daemon start    # writes PID to ~/.agentctl/daemon.pid
-ac daemon status   # checks if PID is alive + socket exists
-ac daemon stop     # sends SIGTERM to daemon PID
+actl daemon start    # writes PID to ~/.agentctl/daemon.pid
+actl daemon status   # checks if PID is alive + socket exists
+actl daemon stop     # sends SIGTERM to daemon PID
 ```
 
 ---
@@ -482,7 +482,7 @@ The terminal registry auto-detects the best available terminal for the current p
 
 ```
 ┌─────────────────────────────────────────────┐
-│                   CLI (ac)                  │
+│                  CLI (actl)                  │
 │          meow parser + command router       │
 ├─────────────────────────────────────────────┤
 │                  TUI (Ink)                  │

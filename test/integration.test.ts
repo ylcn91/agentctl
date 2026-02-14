@@ -32,11 +32,11 @@ afterAll(() => {
 });
 
 describe("CLI integration", () => {
-  test("ac --help shows usage", async () => {
+  test("actl --help shows usage", async () => {
     const result = await $`bun ${CLI_PATH} --help`.env({ ...process.env, AGENTCTL_DIR: TEST_DIR }).quiet().nothrow();
     const output = result.stdout.toString();
     expect(output).toContain("agentctl");
-    expect(output).toContain("ac");
+    expect(output).toContain("actl");
   });
 
   test("ch add creates account", async () => {
@@ -123,9 +123,9 @@ describe("CLI integration", () => {
 });
 
 describe("package.json", () => {
-  test("bin.ac points to cli.tsx", () => {
+  test("bin.actl points to cli.tsx", () => {
     const pkg = JSON.parse(readFileSync(join(import.meta.dir, "..", "package.json"), "utf-8"));
-    expect(pkg.bin?.ac).toBe("./src/cli.tsx");
+    expect(pkg.bin?.actl).toBe("./src/cli.tsx");
   });
 });
 
