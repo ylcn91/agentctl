@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import { useTheme } from "../themes/index.js";
 import type { EntireRetroEvidence } from "../services/retro-engine.js";
 
 interface WorkflowRun {
@@ -27,19 +28,20 @@ interface Props {
   onNavigate: (view: string) => void;
 }
 
-const STEP_STATUS_COLORS: Record<string, string> = {
-  pending: "yellow",
-  assigned: "cyan",
-  completed: "green",
-  failed: "red",
-  skipped: "gray",
-};
-
 export function WorkflowDetail({ runId, onNavigate }: Props) {
+  const { colors } = useTheme();
   const [run, setRun] = useState<WorkflowRun | null>(null);
   const [steps, setSteps] = useState<StepRun[]>([]);
   const [evidence, setEvidence] = useState<EntireRetroEvidence[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const stepStatusColors: Record<string, string> = {
+    pending: colors.warning,
+    assigned: colors.primary,
+    completed: colors.success,
+    failed: colors.error,
+    skipped: colors.textMuted,
+  };
 
   useEffect(() => {
     (async () => {
@@ -60,9 +62,9 @@ export function WorkflowDetail({ runId, onNavigate }: Props) {
           const { getHubDir } = await import("../paths.js");
           const evidencePath = `${getHubDir()}/retro-evidence-${runId}.json`;
           const raw = await atomicRead(evidencePath);
-          if (raw) setEvidence(JSON.parse(raw));
+          if (raw) setEvidence(raw as any);
         } catch {
-          // Evidence not available — that's fine
+          // Evidence not available
         }
       } catch {
         // DB not available
@@ -77,17 +79,19 @@ export function WorkflowDetail({ runId, onNavigate }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading run details...</Text>;
-  if (!run) return <Text color="red">Run not found: {runId}</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading run details...</Text>;
+  if (!run) return <Text color={colors.error}>Run not found: {runId}</Text>;
 
-  const statusColor = {
-    pending: "yellow",
-    running: "cyan",
-    completed: "green",
-    failed: "red",
-    cancelled: "gray",
-    retro_in_progress: "magenta",
-  }[run.status] ?? "gray";
+  const runStatusColors: Record<string, string> = {
+    pending: colors.warning,
+    running: colors.primary,
+    completed: colors.success,
+    failed: colors.error,
+    cancelled: colors.textMuted,
+    retro_in_progress: colors.primaryMuted,
+  };
+
+  const statusColor = runStatusColors[run.status] ?? colors.textMuted;
 
   const duration = run.started_at && run.completed_at
     ? `${Math.round((new Date(run.completed_at).getTime() - new Date(run.started_at).getTime()) / 1000)}s`
@@ -98,14 +102,14 @@ export function WorkflowDetail({ runId, onNavigate }: Props) {
       <Box marginBottom={1}>
         <Text bold>Workflow Run: </Text>
         <Text>{run.workflow_name}</Text>
-        <Text color="gray">  [Esc]back</Text>
+        <Text color={colors.textMuted}>  [Esc]back</Text>
       </Box>
 
       <Box flexDirection="column" marginBottom={1} marginLeft={2}>
-        <Text>ID: <Text color="gray">{run.id}</Text></Text>
+        <Text>ID: <Text color={colors.textMuted}>{run.id}</Text></Text>
         <Text>Status: <Text color={statusColor}>{run.status}</Text></Text>
-        <Text>Duration: <Text color="gray">{duration}</Text></Text>
-        {run.retro_id && <Text>Retro: <Text color="magenta">{run.retro_id.slice(0, 8)}</Text></Text>}
+        <Text>Duration: <Text color={colors.textMuted}>{duration}</Text></Text>
+        {run.retro_id && <Text>Retro: <Text color={colors.primaryMuted}>{run.retro_id.slice(0, 8)}</Text></Text>}
       </Box>
 
       <Box marginBottom={1}>
@@ -113,7 +117,7 @@ export function WorkflowDetail({ runId, onNavigate }: Props) {
       </Box>
 
       {steps.map((step) => {
-        const color = STEP_STATUS_COLORS[step.status] ?? "gray";
+        const color = stepStatusColors[step.status] ?? colors.textMuted;
         const stepDuration = step.started_at && step.completed_at
           ? `${Math.round((new Date(step.completed_at).getTime() - new Date(step.started_at).getTime()) / 1000)}s`
           : null;
@@ -121,11 +125,11 @@ export function WorkflowDetail({ runId, onNavigate }: Props) {
           <Box key={step.id} marginLeft={2}>
             <Text color={color}>[{step.status}]</Text>
             <Text> {step.step_id}</Text>
-            {step.assigned_to && <Text color="magenta"> @{step.assigned_to}</Text>}
-            {stepDuration && <Text color="gray"> ({stepDuration})</Text>}
-            {step.attempt > 1 && <Text color="yellow"> attempt:{step.attempt}</Text>}
+            {step.assigned_to && <Text color={colors.primaryMuted}> @{step.assigned_to}</Text>}
+            {stepDuration && <Text color={colors.textMuted}> ({stepDuration})</Text>}
+            {step.attempt > 1 && <Text color={colors.warning}> attempt:{step.attempt}</Text>}
             {step.result && step.status !== "completed" && (
-              <Text color="red"> {step.result}</Text>
+              <Text color={colors.error}> {step.result}</Text>
             )}
           </Box>
         );
@@ -133,27 +137,27 @@ export function WorkflowDetail({ runId, onNavigate }: Props) {
       {evidence.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
           <Box marginBottom={1}>
-            <Text bold color="magenta">Entire.io Evidence</Text>
+            <Text bold color={colors.primaryMuted}>Entire.io Evidence</Text>
           </Box>
           <Box marginLeft={2} flexDirection="column">
             <Box>
-              <Text color="gray" bold>{"Participant".padEnd(16)}</Text>
-              <Text color="gray" bold>{"Tokens".padEnd(10)}</Text>
-              <Text color="gray" bold>{"Burn Rate".padEnd(12)}</Text>
-              <Text color="gray" bold>{"Files".padEnd(8)}</Text>
-              <Text color="gray" bold>{"Checkpoints".padEnd(14)}</Text>
-              <Text color="gray" bold>Duration</Text>
+              <Text color={colors.textMuted} bold>{"Participant".padEnd(16)}</Text>
+              <Text color={colors.textMuted} bold>{"Tokens".padEnd(10)}</Text>
+              <Text color={colors.textMuted} bold>{"Burn Rate".padEnd(12)}</Text>
+              <Text color={colors.textMuted} bold>{"Files".padEnd(8)}</Text>
+              <Text color={colors.textMuted} bold>{"Checkpoints".padEnd(14)}</Text>
+              <Text color={colors.textMuted} bold>Duration</Text>
             </Box>
             {evidence.map((ev) => (
               <Box key={ev.sessionId}>
                 <Text>{ev.participant.padEnd(16)}</Text>
-                <Text color="cyan">{String(ev.totalTokens).padEnd(10)}</Text>
-                <Text color={ev.tokenBurnRate > 2000 ? "red" : ev.tokenBurnRate > 1000 ? "yellow" : "green"}>
+                <Text color={colors.primary}>{String(ev.totalTokens).padEnd(10)}</Text>
+                <Text color={ev.tokenBurnRate > 2000 ? colors.error : ev.tokenBurnRate > 1000 ? colors.warning : colors.success}>
                   {`${ev.tokenBurnRate}/min`.padEnd(12)}
                 </Text>
                 <Text>{String(ev.filesModified).padEnd(8)}</Text>
                 <Text>{String(ev.checkpointCount).padEnd(14)}</Text>
-                <Text color="gray">{ev.durationMinutes}m</Text>
+                <Text color={colors.textMuted}>{ev.durationMinutes}m</Text>
               </Box>
             ))}
           </Box>

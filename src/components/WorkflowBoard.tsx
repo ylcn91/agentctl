@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { getHubDir } from "../paths.js";
 import { join } from "path";
+import { useTheme } from "../themes/index.js";
 
 interface WorkflowDef {
   name: string;
@@ -23,21 +24,22 @@ interface Props {
   onNavigate: (view: string, detail?: any) => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: "yellow",
-  running: "cyan",
-  completed: "green",
-  failed: "red",
-  cancelled: "gray",
-  retro_in_progress: "magenta",
-};
-
 export function WorkflowBoard({ onNavigate }: Props) {
+  const { colors } = useTheme();
   const [definitions, setDefinitions] = useState<WorkflowDef[]>([]);
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"definitions" | "runs">("definitions");
+
+  const statusColors: Record<string, string> = {
+    pending: colors.warning,
+    running: colors.primary,
+    completed: colors.success,
+    failed: colors.error,
+    cancelled: colors.textMuted,
+    retro_in_progress: colors.primaryMuted,
+  };
 
   useEffect(() => {
     (async () => {
@@ -85,21 +87,21 @@ export function WorkflowBoard({ onNavigate }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading workflows...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading workflows...</Text>;
 
   return (
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>Workflows</Text>
-        <Text color="gray">  [1]Definitions [2]Runs [Enter]detail [Esc]back</Text>
+        <Text color={colors.textMuted}>  [1]Definitions [2]Runs [Enter]detail [Esc]back</Text>
       </Box>
 
       <Box marginBottom={1}>
-        <Text color={tab === "definitions" ? "cyan" : "gray"} bold={tab === "definitions"}>
+        <Text color={tab === "definitions" ? colors.primary : colors.textMuted} bold={tab === "definitions"}>
           Definitions ({definitions.length})
         </Text>
         <Text>  </Text>
-        <Text color={tab === "runs" ? "cyan" : "gray"} bold={tab === "runs"}>
+        <Text color={tab === "runs" ? colors.primary : colors.textMuted} bold={tab === "runs"}>
           Runs ({runs.length})
         </Text>
       </Box>
@@ -107,19 +109,19 @@ export function WorkflowBoard({ onNavigate }: Props) {
       {tab === "definitions" && (
         <Box flexDirection="column">
           {definitions.length === 0 && (
-            <Text color="gray" dimColor>  No workflow definitions found</Text>
+            <Text color={colors.textMuted} dimColor>  No workflow definitions found</Text>
           )}
           {definitions.map((def, i) => {
             const isSelected = i === selectedIndex;
             return (
               <Box key={def.name} marginLeft={1}>
-                <Text color={isSelected ? "white" : "gray"}>{isSelected ? "> " : "  "}</Text>
-                <Text color={isSelected ? "white" : undefined} bold={isSelected}>
+                <Text color={isSelected ? colors.text : colors.textMuted}>{isSelected ? "> " : "  "}</Text>
+                <Text color={isSelected ? colors.text : undefined} bold={isSelected}>
                   {def.name}
                 </Text>
-                <Text color="gray"> v{def.version} ({def.steps.length} steps)</Text>
-                {def.retro && <Text color="magenta"> [retro]</Text>}
-                {def.description && <Text color="gray"> - {def.description}</Text>}
+                <Text color={colors.textMuted}> v{def.version} ({def.steps.length} steps)</Text>
+                {def.retro && <Text color={colors.primaryMuted}> [retro]</Text>}
+                {def.description && <Text color={colors.textMuted}> - {def.description}</Text>}
               </Box>
             );
           })}
@@ -129,18 +131,18 @@ export function WorkflowBoard({ onNavigate }: Props) {
       {tab === "runs" && (
         <Box flexDirection="column">
           {runs.length === 0 && (
-            <Text color="gray" dimColor>  No workflow runs</Text>
+            <Text color={colors.textMuted} dimColor>  No workflow runs</Text>
           )}
           {runs.map((run, i) => {
             const isSelected = i === selectedIndex;
-            const statusColor = STATUS_COLORS[run.status] ?? "gray";
+            const statusColor = statusColors[run.status] ?? colors.textMuted;
             return (
               <Box key={run.id} marginLeft={1}>
-                <Text color={isSelected ? "white" : "gray"}>{isSelected ? "> " : "  "}</Text>
-                <Text color={isSelected ? "white" : undefined}>{run.workflow_name}</Text>
+                <Text color={isSelected ? colors.text : colors.textMuted}>{isSelected ? "> " : "  "}</Text>
+                <Text color={isSelected ? colors.text : undefined}>{run.workflow_name}</Text>
                 <Text color={statusColor}> [{run.status}]</Text>
-                <Text color="gray"> {run.id.slice(0, 8)}</Text>
-                {run.started_at && <Text color="gray"> {run.started_at.slice(0, 16)}</Text>}
+                <Text color={colors.textMuted}> {run.id.slice(0, 8)}</Text>
+                {run.started_at && <Text color={colors.textMuted}> {run.started_at.slice(0, 16)}</Text>}
               </Box>
             );
           })}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { Box, Text, useInput } from "ink";
 import { NavContext } from "../app.js";
+import { useTheme } from "../themes/index.js";
 import { existsSync, readFileSync } from "fs";
 import { createConnection } from "net";
 import { createLineParser, generateRequestId, frameSend } from "../daemon/framing.js";
@@ -124,15 +125,7 @@ async function queryDelegationChains(): Promise<DelegationChainData[]> {
   });
 }
 
-function depthColor(
-  depth: number,
-  maxDepth: number,
-  blocked: boolean,
-): string {
-  if (blocked) return "red";
-  if (depth >= maxDepth - 1) return "yellow";
-  return "green";
-}
+// depthColor moved inside component to use theme
 
 function renderTree(chain: string[], maxDepth: number, blocked: boolean): DelegationNode[] {
   return chain.map((agent, i) => ({
@@ -147,11 +140,18 @@ function renderTree(chain: string[], maxDepth: number, blocked: boolean): Delega
 }
 
 export function DelegationChain({ onNavigate }: Props) {
+  const { colors } = useTheme();
   const [chains, setChains] = useState<DelegationChainData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
   const { refreshTick: globalRefresh } = useContext(NavContext);
+
+  function depthColor(depth: number, maxDepth: number, blocked: boolean): string {
+    if (blocked) return colors.error;
+    if (depth >= maxDepth - 1) return colors.warning;
+    return colors.success;
+  }
 
   useEffect(() => {
     if (globalRefresh > 0) setRefreshTick((prev) => prev + 1);
@@ -190,7 +190,7 @@ export function DelegationChain({ onNavigate }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading delegation chains...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading delegation chains...</Text>;
 
   const maxDepth = DEFAULT_DELEGATION_DEPTH_CONFIG.maxDepth;
   const blockedCount = chains.filter((c) => c.blocked).length;
@@ -199,20 +199,20 @@ export function DelegationChain({ onNavigate }: Props) {
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>Delegation Chains</Text>
-        <Text color="gray">  [r]efresh [up/down]navigate [Esc]back  </Text>
+        <Text color={colors.textMuted}>  [r]efresh [up/down]navigate [Esc]back  </Text>
         <Text>{chains.length} chains</Text>
-        <Text color="gray"> | </Text>
+        <Text color={colors.textMuted}> | </Text>
         <Text>max depth: {maxDepth}</Text>
         {blockedCount > 0 && (
           <>
-            <Text color="gray"> | </Text>
-            <Text color="red">{blockedCount} blocked</Text>
+            <Text color={colors.textMuted}> | </Text>
+            <Text color={colors.error}>{blockedCount} blocked</Text>
           </>
         )}
       </Box>
 
       {chains.length === 0 ? (
-        <Text color="gray">
+        <Text color={colors.textMuted}>
           No delegation chains recorded. Delegation events appear when agents
           hand off tasks to sub-agents.
         </Text>
@@ -227,13 +227,13 @@ export function DelegationChain({ onNavigate }: Props) {
               marginBottom={idx < chains.length - 1 ? 1 : 0}
             >
               <Box>
-                <Text color={idx === selectedIndex ? "white" : "gray"}>
+                <Text color={idx === selectedIndex ? colors.text : colors.textMuted}>
                   {idx === selectedIndex ? "> " : "  "}
                 </Text>
                 <Text bold={idx === selectedIndex}>
                   task: {c.taskId.slice(0, 12)}
                 </Text>
-                {c.blocked && <Text color="red"> BLOCKED</Text>}
+                {c.blocked && <Text color={colors.error}> BLOCKED</Text>}
               </Box>
               {nodes.map((node, ni) => {
                 const prefix = ni === 0 ? "" : "\u2514\u2500 ";
@@ -245,18 +245,18 @@ export function DelegationChain({ onNavigate }: Props) {
                 );
                 return (
                   <Box key={ni} marginLeft={4}>
-                    <Text color="gray">
+                    <Text color={colors.textMuted}>
                       {ni === 0 ? "" : padding}
                       {prefix}
                     </Text>
                     <Text color={color}>
                       {node.agent}
                     </Text>
-                    <Text color="gray">
+                    <Text color={colors.textMuted}>
                       {" "}(depth {node.depth}/{c.maxDepth})
                     </Text>
                     {node.blocked && node.blockReason && (
-                      <Text color="red"> - {node.blockReason}</Text>
+                      <Text color={colors.error}> - {node.blockReason}</Text>
                     )}
                   </Box>
                 );

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { loadPrompts, savePrompt, deletePrompt, searchPrompts, type SavedPrompt } from "../services/prompt-library.js";
+import { useTheme } from "../themes/index.js";
 
 interface Props {
   onNavigate: (view: string) => void;
@@ -9,6 +10,7 @@ interface Props {
 type Mode = "browse" | "search" | "view" | "add-title" | "add-content";
 
 export function PromptLibrary({ onNavigate }: Props) {
+  const { colors } = useTheme();
   const [prompts, setPrompts] = useState<SavedPrompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -118,68 +120,68 @@ export function PromptLibrary({ onNavigate }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading prompts...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading prompts...</Text>;
 
   return (
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>Prompt Library</Text>
-        <Text color="gray">  [/]search [a]dd [d]elete [Enter]view [Esc]back</Text>
+        <Text color={colors.textMuted}>  [/]search [a]dd [d]elete [Enter]view [Esc]back</Text>
       </Box>
 
       {mode === "search" && (
         <Box marginBottom={1}>
-          <Text color="cyan">Search: </Text>
+          <Text color={colors.primary}>Search: </Text>
           <Text>{inputBuffer}</Text>
-          <Text color="gray">_</Text>
+          <Text color={colors.textMuted}>_</Text>
         </Box>
       )}
 
       {mode === "add-title" && (
         <Box marginBottom={1}>
-          <Text color="cyan">Title: </Text>
+          <Text color={colors.primary}>Title: </Text>
           <Text>{inputBuffer}</Text>
-          <Text color="gray">_</Text>
+          <Text color={colors.textMuted}>_</Text>
         </Box>
       )}
 
       {mode === "add-content" && (
         <Box marginBottom={1}>
-          <Text color="cyan">Content for "{newTitle}": </Text>
+          <Text color={colors.primary}>Content for "{newTitle}": </Text>
           <Text>{inputBuffer}</Text>
-          <Text color="gray">_</Text>
+          <Text color={colors.textMuted}>_</Text>
         </Box>
       )}
 
       {mode === "view" && viewingPrompt && (
         <Box flexDirection="column" marginBottom={1}>
-          <Text bold color="cyan">{viewingPrompt.title}</Text>
+          <Text bold color={colors.primary}>{viewingPrompt.title}</Text>
           {viewingPrompt.tags && viewingPrompt.tags.length > 0 && (
-            <Text color="blue">Tags: #{viewingPrompt.tags.join(" #")}</Text>
+            <Text color={colors.info}>Tags: #{viewingPrompt.tags.join(" #")}</Text>
           )}
           <Box marginTop={1}>
             <Text wrap="wrap">{viewingPrompt.content}</Text>
           </Box>
-          <Text color="gray" dimColor>Used {viewingPrompt.usageCount} times | Press Esc to go back</Text>
+          <Text color={colors.textMuted} dimColor>Used {viewingPrompt.usageCount} times | Press Esc to go back</Text>
         </Box>
       )}
 
       {mode === "browse" && prompts.length === 0 && (
-        <Text color="gray">No prompts saved. Press [a] to add one.</Text>
+        <Text color={colors.textMuted}>No prompts saved. Press [a] to add one.</Text>
       )}
 
       {(mode === "browse" || mode === "search") && prompts.map((p, idx) => (
         <Box key={p.id} marginLeft={1}>
-          <Text color={idx === selectedIndex ? "white" : "gray"}>
+          <Text color={idx === selectedIndex ? colors.text : colors.textMuted}>
             {idx === selectedIndex ? "> " : "  "}
           </Text>
-          <Text color={idx === selectedIndex ? "white" : undefined}>
+          <Text color={idx === selectedIndex ? colors.text : undefined}>
             {p.title}
           </Text>
           {p.tags && p.tags.length > 0 && (
-            <Text color="blue"> #{p.tags.join(" #")}</Text>
+            <Text color={colors.info}> #{p.tags.join(" #")}</Text>
           )}
-          <Text color="gray"> ({p.usageCount} uses)</Text>
+          <Text color={colors.textMuted}> ({p.usageCount} uses)</Text>
         </Box>
       ))}
     </Box>

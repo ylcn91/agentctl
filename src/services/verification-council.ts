@@ -1,7 +1,7 @@
 // Phase 6: Council as Verification Panel
 // Multi-LLM verification of task completion via council consensus
 
-import { CouncilService, parseJSONFromLLM } from "./council";
+import { parseJSONFromLLM } from "./council";
 import type { LLMCaller } from "./council";
 import type { CouncilServiceConfig } from "./council-config";
 import { computeSpecHash } from "./verification-receipts";
@@ -18,7 +18,7 @@ export interface VerificationReceipt {
 }
 
 export interface VerificationReview {
-  model: string;
+  account: string;
   verdict: VerificationVerdict;
   confidence: number;
   reasoning: string;
@@ -113,12 +113,8 @@ export async function verifyTaskCompletion(
   handoffPayload: HandoffPayloadForVerification,
   config?: Partial<CouncilServiceConfig> & { llmCaller?: LLMCaller },
 ): Promise<VerificationResult> {
-  const models = config?.models ?? [
-    "openai/gpt-4o",
-    "anthropic/claude-sonnet-4-5-20250929",
-    "google/gemini-2.5-pro-preview",
-  ];
-  const chairman = config?.chairman ?? "anthropic/claude-sonnet-4-5-20250929";
+  const members = config?.members ?? [];
+  const chairman = config?.chairman ?? "";
 
   const llmCaller = config?.llmCaller;
   if (!llmCaller) {
@@ -129,23 +125,23 @@ export async function verifyTaskCompletion(
   const taskContext = buildTaskContext(handoffPayload, reviewBundle);
 
   // Stage 1: Collect independent reviews
-  const individualReviews = await stage1_collectReviews(models, llmCaller, taskContext);
+  const individualReviews = await stage1_collectReviews(members, llmCaller, taskContext);
 
   if (individualReviews.length === 0) {
     const receipt = createVerificationReceipt(taskId, "REJECT", handoffPayload, reviewBundle);
     return {
       verdict: "REJECT",
       confidence: 0,
-      notes: ["All verification models failed to respond"],
+      notes: ["All verification accounts failed to respond"],
       receipt,
       individualReviews: [],
       peerEvaluations: [],
-      chairmanReasoning: "Unable to verify — all models failed",
+      chairmanReasoning: "Unable to verify — all accounts failed",
     };
   }
 
   // Stage 2: Peer review of evaluations
-  const peerEvaluations = await stage2_peerReview(models, llmCaller, taskContext, individualReviews);
+  const peerEvaluations = await stage2_peerReview(members, llmCaller, taskContext, individualReviews);
 
   // Stage 3: Chairman synthesis
   const synthesis = await stage3_chairmanVerdict(chairman, llmCaller, taskContext, individualReviews, peerEvaluations);
@@ -189,19 +185,19 @@ function buildTaskContext(
 }
 
 async function stage1_collectReviews(
-  models: string[],
+  accounts: string[],
   llmCaller: LLMCaller,
   taskContext: string,
 ): Promise<VerificationReview[]> {
   const results = await Promise.allSettled(
-    models.map(async (model) => {
-      const response = await llmCaller(model, VERIFICATION_STAGE1_PROMPT, taskContext);
+    accounts.map(async (account) => {
+      const response = await llmCaller(account, VERIFICATION_STAGE1_PROMPT, taskContext);
       const parsed = parseJSONFromLLM(response);
       if (!parsed) {
-        throw new Error(`Failed to parse verification response from ${model}`);
+        throw new Error(`Failed to parse verification response from ${account}`);
       }
       return {
-        model,
+        account,
         verdict: normalizeVerdict(parsed.verdict),
         confidence: parsed.confidence ?? 0.5,
         reasoning: parsed.reasoning ?? "",
@@ -217,7 +213,7 @@ async function stage1_collectReviews(
 }
 
 async function stage2_peerReview(
-  models: string[],
+  accounts: string[],
   llmCaller: LLMCaller,
   taskContext: string,
   reviews: VerificationReview[],
@@ -232,14 +228,14 @@ async function stage2_peerReview(
   const userPrompt = `${taskContext}\n\nHere are the verification reviews to evaluate:\n\n${anonymized}`;
 
   const results = await Promise.allSettled(
-    models.map(async (model) => {
-      const response = await llmCaller(model, VERIFICATION_STAGE2_PROMPT, userPrompt);
+    accounts.map(async (account) => {
+      const response = await llmCaller(account, VERIFICATION_STAGE2_PROMPT, userPrompt);
       const parsed = parseJSONFromLLM(response);
       if (!parsed) {
-        throw new Error(`Failed to parse peer review from ${model}`);
+        throw new Error(`Failed to parse peer review from ${account}`);
       }
       return {
-        reviewer: model,
+        reviewer: account,
         ranking: parsed.ranking ?? [],
         reasoning: parsed.reasoning ?? "",
       } as PeerEvaluation;
@@ -260,7 +256,7 @@ async function stage3_chairmanVerdict(
 ): Promise<{ verdict: VerificationVerdict; confidence: number; notes: string[]; reasoning: string }> {
   const reviewsText = reviews
     .map((r, i) => {
-      return `Review ${i + 1} (${r.model}):\n- Verdict: ${r.verdict}\n- Confidence: ${r.confidence}\n- Reasoning: ${r.reasoning}\n- Issues: ${r.issues.join("; ") || "none"}\n- Strengths: ${r.strengths.join("; ") || "none"}`;
+      return `Review ${i + 1} (${r.account}):\n- Verdict: ${r.verdict}\n- Confidence: ${r.confidence}\n- Reasoning: ${r.reasoning}\n- Issues: ${r.issues.join("; ") || "none"}\n- Strengths: ${r.strengths.join("; ") || "none"}`;
     })
     .join("\n\n");
 

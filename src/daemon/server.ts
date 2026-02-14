@@ -80,7 +80,7 @@ export interface DaemonOpts {
     delegationDepth?: DelegationDepthConfig;
   };
   entireGitDir?: string;
-  council?: { models: string[]; chairman: string; apiKey?: string };
+  council?: { members: string[]; chairman: string };
 }
 
 export async function startDaemon(opts?: DaemonOpts): Promise<{ server: Server; state: DaemonState; sockPath: string; watchdog?: { stop: () => void }; sessionCleanupTimer?: ReturnType<typeof setInterval>; entireAdapter?: import("../services/entire-adapter").EntireAdapter }> {
@@ -1490,13 +1490,15 @@ export async function startDaemon(opts?: DaemonOpts): Promise<{ server: Server; 
             return;
           }
           try {
-            const { CouncilService } = await import("../services/council");
-            const config = councilConfig ?? (await loadConfig()).council;
-            if (!config) {
+            const { CouncilService, createAccountCaller } = await import("../services/council");
+            const fullConfig = await loadConfig();
+            const council_config = councilConfig ?? fullConfig.council;
+            if (!council_config) {
               safeWrite(socket, reply(msg, { type: "error", error: "Council not configured (missing council config)" }));
               return;
             }
-            const council = new CouncilService(config);
+            const llmCaller = createAccountCaller(fullConfig.accounts);
+            const council = new CouncilService(council_config, llmCaller);
             const analysis = await council.analyze(msg.goal, msg.context);
             safeWrite(socket, reply(msg, { type: "result", analysis }));
           } catch (err: any) {

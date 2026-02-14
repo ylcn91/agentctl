@@ -1,15 +1,16 @@
-import React from "react";
 import { Box, Text } from "ink";
 import { UsageBar } from "./UsageBar.js";
+import { useTheme } from "../themes/index.js";
 import type { QuotaEstimate } from "../providers/types.js";
 
 export function QuotaBar({ estimate }: { estimate: QuotaEstimate }) {
+  const { colors } = useTheme();
   const confidenceColor =
     estimate.confidence === "high"
-      ? "green"
+      ? colors.success
       : estimate.confidence === "medium"
-        ? "yellow"
-        : "gray";
+        ? colors.warning
+        : colors.textMuted;
   return (
     <Box>
       <Text>~5h quota: </Text>

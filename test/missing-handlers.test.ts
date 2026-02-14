@@ -147,7 +147,7 @@ describe("report_progress handler logic", () => {
 describe("council_analyze handler logic", () => {
   test("CouncilService can be instantiated with config and custom caller", async () => {
     const { CouncilService } = await import("../src/services/council");
-    const mockCaller = async (_model: string, _sys: string, _user: string) =>
+    const mockCaller = async (_account: string, _sys: string, _user: string) =>
       JSON.stringify({
         complexity: "medium",
         estimatedDurationMinutes: 30,
@@ -157,7 +157,7 @@ describe("council_analyze handler logic", () => {
       });
 
     const council = new CouncilService(
-      { models: ["test-model"], chairman: "test-model" },
+      { members: ["test-account"], chairman: "test-account" },
       mockCaller,
     );
     expect(council).toBeDefined();
@@ -167,7 +167,7 @@ describe("council_analyze handler logic", () => {
     const { CouncilService } = await import("../src/services/council");
     let callCount = 0;
 
-    const mockCaller = async (_model: string, systemPrompt: string, _user: string) => {
+    const mockCaller = async (_account: string, systemPrompt: string, _user: string) => {
       callCount++;
       // Stage 1: individual analysis
       if (systemPrompt.includes("task analysis expert")) {
@@ -200,7 +200,7 @@ describe("council_analyze handler logic", () => {
     };
 
     const council = new CouncilService(
-      { models: ["model-a"], chairman: "model-a" },
+      { members: ["account-a"], chairman: "account-a" },
       mockCaller,
     );
 
@@ -208,21 +208,17 @@ describe("council_analyze handler logic", () => {
     expect(result.taskGoal).toBe("Build a new feature");
     expect(result.timestamp).toBeDefined();
     expect(result.individualAnalyses).toHaveLength(1);
-    expect(result.synthesis.chairman).toBe("model-a");
+    expect(result.synthesis.chairman).toBe("account-a");
     expect(result.synthesis.consensusComplexity).toBe("medium");
     expect(result.synthesis.confidence).toBe(0.8);
   });
 
-  test("CouncilService throws when no API key provided and no custom caller", async () => {
+  test("CouncilService throws when no LLM caller provided", async () => {
     const { CouncilService } = await import("../src/services/council");
-    const origKey = process.env.OPENROUTER_API_KEY;
-    delete process.env.OPENROUTER_API_KEY;
 
     expect(() => {
-      new CouncilService({ models: ["m"], chairman: "m" });
-    }).toThrow("Council requires an OpenRouter API key");
-
-    if (origKey) process.env.OPENROUTER_API_KEY = origKey;
+      new CouncilService({ members: ["m"], chairman: "m" });
+    }).toThrow("Council requires an LLM caller");
   });
 });
 

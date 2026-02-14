@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import { loadConfig } from "../config.js";
 import { fetchUnreadMessages } from "../services/daemon-client.js";
 import { NavContext } from "../app.js";
+import { useTheme } from "../themes/index.js";
 
 interface Message {
   id: string;
@@ -27,6 +28,7 @@ interface Props {
 type Mode = "browse" | "search";
 
 export function MessageInbox({ onNavigate: _onNavigate }: Props) {
+  const { colors } = useTheme();
   const [accounts, setAccounts] = useState<AccountMessages[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAccount, setSelectedAccount] = useState(0);
@@ -99,15 +101,15 @@ export function MessageInbox({ onNavigate: _onNavigate }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading messages...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading messages...</Text>;
 
   const totalUnread = filteredAccounts.reduce((sum, a) => sum + a.messages.length, 0);
 
   if (accounts.length === 0) {
     return (
       <Box flexDirection="column" paddingY={1}>
-        <Text color="gray">No accounts configured.</Text>
-        <Text color="gray">Press [a] to add an account, or run: actl add {"<name>"}</Text>
+        <Text color={colors.textMuted}>No accounts configured.</Text>
+        <Text color={colors.textMuted}>Press [a] to add an account, or run: actl add {"<name>"}</Text>
       </Box>
     );
   }
@@ -120,15 +122,15 @@ export function MessageInbox({ onNavigate: _onNavigate }: Props) {
 
       {mode === "search" && (
         <Box marginTop={1}>
-          <Text color="cyan">Search: </Text>
+          <Text color={colors.primary}>Search: </Text>
           <Text>{searchQuery}</Text>
-          <Text color="gray">_</Text>
+          <Text color={colors.textMuted}>_</Text>
         </Box>
       )}
 
       {searchQuery && mode === "browse" && (
         <Box marginTop={1}>
-          <Text color="cyan">filter: "{searchQuery}"</Text>
+          <Text color={colors.primary}>filter: "{searchQuery}"</Text>
         </Box>
       )}
 
@@ -138,29 +140,29 @@ export function MessageInbox({ onNavigate: _onNavigate }: Props) {
             <Text color={a.accountColor} bold inverse={idx === selectedAccount}>
               {a.accountName}
             </Text>
-            <Text color="gray">
+            <Text color={colors.textMuted}>
               {" "}({a.messages.length} message{a.messages.length !== 1 ? "s" : ""})
             </Text>
           </Box>
           {a.messages.length === 0 && (
             <Box marginLeft={2}>
-              <Text color="gray">No new messages</Text>
+              <Text color={colors.textMuted}>No new messages</Text>
             </Box>
           )}
           {a.messages.map((msg) => (
             <Box key={msg.id} marginLeft={2} flexDirection="column">
               <Box>
-                <Text color={msg.type === "handoff" ? "yellow" : "white"}>
+                <Text color={msg.type === "handoff" ? colors.warning : colors.text}>
                   [{msg.type}] from {msg.from}
                 </Text>
-                <Text color="gray"> {formatTime(msg.timestamp)}</Text>
+                <Text color={colors.textMuted}> {formatTime(msg.timestamp)}</Text>
               </Box>
               <Box marginLeft={2}>
                 <Text wrap="wrap">{msg.content}</Text>
               </Box>
               {msg.context && Object.keys(msg.context).length > 0 && (
                 <Box marginLeft={2}>
-                  <Text color="gray">
+                  <Text color={colors.textMuted}>
                     context: {Object.entries(msg.context).map(([k, v]) => `${k}=${v}`).join(", ")}
                   </Text>
                 </Box>
@@ -170,7 +172,7 @@ export function MessageInbox({ onNavigate: _onNavigate }: Props) {
         </Box>
       ))}
       <Box marginTop={1}>
-        <Text color="gray">[j/k] navigate  [/] search  [Esc] dashboard  [q] quit</Text>
+        <Text color={colors.textMuted}>[j/k] navigate  [/] search  [Esc] dashboard  [q] quit</Text>
       </Box>
     </Box>
   );

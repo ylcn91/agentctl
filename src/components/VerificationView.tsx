@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { Box, Text, useInput } from "ink";
 import { NavContext } from "../app.js";
+import { useTheme } from "../themes/index.js";
 import { atomicRead } from "../services/file-store.js";
 import { getHubDir } from "../paths.js";
 import type { VerificationVerdict, VerificationResult } from "../services/verification-council.js";
@@ -9,23 +10,13 @@ interface Props {
   onNavigate: (view: string) => void;
 }
 
-const VERDICT_COLORS: Record<VerificationVerdict, string> = {
-  ACCEPT: "green",
-  REJECT: "red",
-  ACCEPT_WITH_NOTES: "yellow",
-};
-
 const VERDICT_LABELS: Record<VerificationVerdict, string> = {
   ACCEPT: "PASS",
   REJECT: "FAIL",
   ACCEPT_WITH_NOTES: "WARN",
 };
 
-function confidenceColor(c: number): string {
-  if (c >= 0.8) return "green";
-  if (c >= 0.5) return "yellow";
-  return "red";
-}
+// VERDICT_COLORS and confidenceColor moved inside components to use theme
 
 function getVerificationCachePath(): string {
   return `${getHubDir()}/verification-results.json`;
@@ -36,12 +27,25 @@ interface VerificationCache {
 }
 
 export function VerificationView({ onNavigate }: Props) {
+  const { colors } = useTheme();
   const [results, setResults] = useState<VerificationResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [detailView, setDetailView] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const { refreshTick: globalRefresh } = useContext(NavContext);
+
+  const VERDICT_COLORS: Record<VerificationVerdict, string> = {
+    ACCEPT: colors.success,
+    REJECT: colors.error,
+    ACCEPT_WITH_NOTES: colors.warning,
+  };
+
+  function confidenceColor(c: number): string {
+    if (c >= 0.8) return colors.success;
+    if (c >= 0.5) return colors.warning;
+    return colors.error;
+  }
 
   useEffect(() => {
     if (globalRefresh > 0) setRefreshTick((prev) => prev + 1);
@@ -89,17 +93,17 @@ export function VerificationView({ onNavigate }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading verification results...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading verification results...</Text>;
 
   if (results.length === 0) {
     return (
       <Box flexDirection="column" paddingY={1}>
         <Box marginBottom={1}>
           <Text bold>Verification View</Text>
-          <Text color="gray">  [r]efresh [Esc]back</Text>
+          <Text color={colors.textMuted}>  [r]efresh [Esc]back</Text>
         </Box>
-        <Text color="gray">No verification results found.</Text>
-        <Text color="gray" dimColor>
+        <Text color={colors.textMuted}>No verification results found.</Text>
+        <Text color={colors.textMuted} dimColor>
           Verified tasks will appear here after council review.
         </Text>
       </Box>
@@ -108,38 +112,38 @@ export function VerificationView({ onNavigate }: Props) {
 
   if (detailView) {
     const result = results[selectedIndex] ?? results[0];
-    return <VerificationDetail result={result} selectedIndex={selectedIndex} />;
+    return <VerificationDetail result={result} selectedIndex={selectedIndex} colors={colors} />;
   }
 
   return (
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>Verification View</Text>
-        <Text color="gray">  [Enter]detail [r]efresh [Esc]back</Text>
+        <Text color={colors.textMuted}>  [Enter]detail [r]efresh [Esc]back</Text>
       </Box>
 
       {results.map((result, idx) => {
         const isSelected = idx === selectedIndex;
         return (
           <Box key={idx} marginLeft={1}>
-            <Text color={isSelected ? "white" : "gray"}>
+            <Text color={isSelected ? colors.text : colors.textMuted}>
               {isSelected ? "> " : "  "}
             </Text>
             <Text color={VERDICT_COLORS[result.verdict]} bold>
               [{VERDICT_LABELS[result.verdict]}]
             </Text>
             <Text> </Text>
-            <Text color={isSelected ? "white" : undefined}>
+            <Text color={isSelected ? colors.text : undefined}>
               {result.receipt.taskId}
             </Text>
-            <Text color="gray"> | </Text>
+            <Text color={colors.textMuted}> | </Text>
             <Text color={confidenceColor(result.confidence)}>
               {(result.confidence * 100).toFixed(0)}%
             </Text>
-            <Text color="gray">
+            <Text color={colors.textMuted}>
               {" "}| {result.individualReviews.length} reviews
             </Text>
-            <Text color="gray" dimColor>
+            <Text color={colors.textMuted} dimColor>
               {" "}| {result.receipt.timestamp.slice(0, 16).replace("T", " ")}
             </Text>
           </Box>
@@ -148,17 +152,17 @@ export function VerificationView({ onNavigate }: Props) {
 
       {/* Summary stats */}
       <Box marginTop={1} flexDirection="column">
-        <Text bold color="gray">Summary</Text>
+        <Text bold color={colors.textMuted}>Summary</Text>
         <Box marginLeft={2}>
-          <Text color="green">
+          <Text color={colors.success}>
             {results.filter((r) => r.verdict === "ACCEPT").length} accepted
           </Text>
-          <Text color="gray"> | </Text>
-          <Text color="yellow">
+          <Text color={colors.textMuted}> | </Text>
+          <Text color={colors.warning}>
             {results.filter((r) => r.verdict === "ACCEPT_WITH_NOTES").length} with notes
           </Text>
-          <Text color="gray"> | </Text>
-          <Text color="red">
+          <Text color={colors.textMuted}> | </Text>
+          <Text color={colors.error}>
             {results.filter((r) => r.verdict === "REJECT").length} rejected
           </Text>
         </Box>
@@ -170,15 +174,28 @@ export function VerificationView({ onNavigate }: Props) {
 function VerificationDetail({
   result,
   selectedIndex,
+  colors,
 }: {
   result: VerificationResult;
   selectedIndex: number;
+  colors: Record<string, string>;
 }) {
+  const VERDICT_COLORS: Record<VerificationVerdict, string> = {
+    ACCEPT: colors.success,
+    REJECT: colors.error,
+    ACCEPT_WITH_NOTES: colors.warning,
+  };
+
+  function confidenceColor(c: number): string {
+    if (c >= 0.8) return colors.success;
+    if (c >= 0.5) return colors.warning;
+    return colors.error;
+  }
   return (
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>Verification Detail</Text>
-        <Text color="gray">  [Esc]back</Text>
+        <Text color={colors.textMuted}>  [Esc]back</Text>
       </Box>
 
       {/* Verdict header */}
@@ -187,7 +204,7 @@ function VerificationDetail({
         <Text color={VERDICT_COLORS[result.verdict]} bold>
           {result.verdict}
         </Text>
-        <Text color="gray"> | Confidence: </Text>
+        <Text color={colors.textMuted}> | Confidence: </Text>
         <Text color={confidenceColor(result.confidence)}>
           {(result.confidence * 100).toFixed(0)}%
         </Text>
@@ -207,7 +224,7 @@ function VerificationDetail({
           <Text bold>Notes</Text>
           {result.notes.map((note, i) => (
             <Box key={i} marginLeft={2}>
-              <Text color="yellow">- {note}</Text>
+              <Text color={colors.warning}>- {note}</Text>
             </Box>
           ))}
         </Box>
@@ -221,17 +238,17 @@ function VerificationDetail({
           return (
             <Box key={idx} marginLeft={2} flexDirection="column">
               <Box>
-                <Text color={isSelected ? "white" : "gray"}>
+                <Text color={isSelected ? colors.text : colors.textMuted}>
                   {isSelected ? "> " : "  "}
                 </Text>
                 <Text color={VERDICT_COLORS[review.verdict]} bold>
                   [{VERDICT_LABELS[review.verdict]}]
                 </Text>
                 <Text> </Text>
-                <Text color={isSelected ? "white" : undefined} bold={isSelected}>
-                  {review.model}
+                <Text color={isSelected ? colors.text : undefined} bold={isSelected}>
+                  {review.account}
                 </Text>
-                <Text color="gray"> | </Text>
+                <Text color={colors.textMuted}> | </Text>
                 <Text color={confidenceColor(review.confidence)}>
                   {(review.confidence * 100).toFixed(0)}%
                 </Text>
@@ -241,17 +258,17 @@ function VerificationDetail({
                   <Text>{review.reasoning}</Text>
                   {review.strengths.length > 0 && (
                     <Box flexDirection="column">
-                      <Text color="green">Strengths:</Text>
+                      <Text color={colors.success}>Strengths:</Text>
                       {review.strengths.map((s, i) => (
-                        <Text key={i} color="green" dimColor>  + {s}</Text>
+                        <Text key={i} color={colors.success} dimColor>  + {s}</Text>
                       ))}
                     </Box>
                   )}
                   {review.issues.length > 0 && (
                     <Box flexDirection="column">
-                      <Text color="red">Issues:</Text>
+                      <Text color={colors.error}>Issues:</Text>
                       {review.issues.map((s, i) => (
-                        <Text key={i} color="red" dimColor>  - {s}</Text>
+                        <Text key={i} color={colors.error} dimColor>  - {s}</Text>
                       ))}
                     </Box>
                   )}
@@ -269,12 +286,12 @@ function VerificationDetail({
           {result.peerEvaluations.map((pe, idx) => (
             <Box key={idx} marginLeft={2} flexDirection="column">
               <Box>
-                <Text color="gray">  </Text>
+                <Text color={colors.textMuted}>  </Text>
                 <Text>{pe.reviewer}</Text>
-                <Text color="gray"> ranked: [{pe.ranking.join(", ")}]</Text>
+                <Text color={colors.textMuted}> ranked: [{pe.ranking.join(", ")}]</Text>
               </Box>
               <Box marginLeft={4}>
-                <Text color="gray" dimColor>{pe.reasoning}</Text>
+                <Text color={colors.textMuted} dimColor>{pe.reasoning}</Text>
               </Box>
             </Box>
           ))}
@@ -286,19 +303,19 @@ function VerificationDetail({
         <Text bold>Receipt</Text>
         <Box marginLeft={2} flexDirection="column">
           <Box>
-            <Text color="gray">Task ID:      </Text>
+            <Text color={colors.textMuted}>Task ID:      </Text>
             <Text>{result.receipt.taskId}</Text>
           </Box>
           <Box>
-            <Text color="gray">Spec Hash:    </Text>
-            <Text color="cyan">{result.receipt.specHash.slice(0, 16)}...</Text>
+            <Text color={colors.textMuted}>Spec Hash:    </Text>
+            <Text color={colors.primary}>{result.receipt.specHash.slice(0, 16)}...</Text>
           </Box>
           <Box>
-            <Text color="gray">Evidence Hash: </Text>
-            <Text color="cyan">{result.receipt.evidenceHash.slice(0, 16)}...</Text>
+            <Text color={colors.textMuted}>Evidence Hash: </Text>
+            <Text color={colors.primary}>{result.receipt.evidenceHash.slice(0, 16)}...</Text>
           </Box>
           <Box>
-            <Text color="gray">Timestamp:    </Text>
+            <Text color={colors.textMuted}>Timestamp:    </Text>
             <Text>{result.receipt.timestamp}</Text>
           </Box>
         </Box>

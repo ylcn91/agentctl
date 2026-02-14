@@ -1,5 +1,5 @@
-import type { CouncilResponse, CouncilRanking, AggregateRank } from "../types";
-import { DEFAULT_COUNCIL_CONFIG, OPENROUTER_API_URL } from "./council-config";
+import type { CouncilResponse, CouncilRanking, AggregateRank, AccountConfig } from "../types";
+import { DEFAULT_COUNCIL_CONFIG } from "./council-config";
 import type { CouncilServiceConfig } from "./council-config";
 
 export { type CouncilServiceConfig as CouncilConfig };
@@ -22,7 +22,7 @@ export interface CouncilAnalysis {
   };
 }
 
-export type LLMCaller = (model: string, systemPrompt: string, userPrompt: string) => Promise<string>;
+export type LLMCaller = (account: string, systemPrompt: string, userPrompt: string) => Promise<string>;
 
 export function parseJSONFromLLM(text: string): any {
   try {
@@ -41,60 +41,125 @@ export function parseJSONFromLLM(text: string): any {
   }
 }
 
-export function createOpenRouterCaller(apiKey: string, baseUrl?: string): LLMCaller {
-  const url = baseUrl ?? OPENROUTER_API_URL;
-  return async (model: string, systemPrompt: string, userPrompt: string): Promise<string> => {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    });
+interface ProviderCommand {
+  cmd: string[];
+  env: Record<string, string>;
+  parseOutput: (stdout: string) => string;
+}
 
-    if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`);
+export function buildProviderCommand(account: AccountConfig, prompt: string): ProviderCommand {
+  const baseEnv: Record<string, string> = {};
+
+  switch (account.provider) {
+    case "claude-code":
+      return {
+        cmd: ["claude", "-p", "--output-format", "json"],
+        env: { ...baseEnv, CLAUDE_CONFIG_DIR: account.configDir },
+        parseOutput: (stdout: string) => {
+          try {
+            const json = JSON.parse(stdout);
+            return json.result ?? stdout;
+          } catch {
+            return stdout;
+          }
+        },
+      };
+    case "codex-cli":
+      return {
+        cmd: ["codex", "-q"],
+        env: { ...baseEnv, CODEX_HOME: account.configDir },
+        parseOutput: (stdout: string) => stdout,
+      };
+    case "opencode":
+      return {
+        cmd: ["opencode", "run"],
+        env: baseEnv,
+        parseOutput: (stdout: string) => stdout,
+      };
+    case "cursor-agent":
+      return {
+        cmd: ["agent"],
+        env: baseEnv,
+        parseOutput: (stdout: string) => stdout,
+      };
+    case "gemini-cli":
+      return {
+        cmd: ["gemini"],
+        env: baseEnv,
+        parseOutput: (stdout: string) => stdout,
+      };
+    case "openhands":
+      return {
+        cmd: ["openhands"],
+        env: baseEnv,
+        parseOutput: (stdout: string) => stdout,
+      };
+    default:
+      throw new Error(`Unsupported provider: ${account.provider}`);
+  }
+}
+
+export function createAccountCaller(accounts: AccountConfig[]): LLMCaller {
+  const accountMap = new Map<string, AccountConfig>();
+  for (const acc of accounts) {
+    accountMap.set(acc.name, acc);
+  }
+
+  return async (accountName: string, systemPrompt: string, userPrompt: string): Promise<string> => {
+    const account = accountMap.get(accountName);
+    if (!account) {
+      throw new Error(`Account not found: ${accountName}`);
     }
 
-    const data = await response.json() as any;
-    return data.choices[0].message.content;
+    const prompt = `${systemPrompt}\n\n${userPrompt}`;
+    const { cmd, env, parseOutput } = buildProviderCommand(account, prompt);
+
+    const proc = Bun.spawn(cmd, {
+      stdin: new Response(prompt).body,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, ...env },
+    });
+
+    const stdout = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+
+    if (exitCode !== 0) {
+      const stderr = await new Response(proc.stderr).text();
+      throw new Error(`Account ${accountName} CLI exited with code ${exitCode}: ${stderr.slice(0, 500)}`);
+    }
+
+    return parseOutput(stdout.trim());
   };
 }
 
 /**
  * Calculate aggregate rankings from peer review results.
  * Each ranking is an array of 0-based indices (best-to-worst).
- * Returns models sorted by average rank (lower is better).
+ * Returns accounts sorted by average rank (lower is better).
  */
 export function calculateAggregateRankings(
   rankings: CouncilRanking[],
-  models: string[],
+  accounts: string[],
 ): AggregateRank[] {
   const positionSums = new Map<string, { total: number; count: number }>();
 
   for (const r of rankings) {
     for (let position = 0; position < r.ranking.length; position++) {
-      const modelIndex = r.ranking[position];
-      if (modelIndex < 0 || modelIndex >= models.length) continue;
-      const model = models[modelIndex];
-      const entry = positionSums.get(model) ?? { total: 0, count: 0 };
+      const accountIndex = r.ranking[position];
+      if (accountIndex < 0 || accountIndex >= accounts.length) continue;
+      const account = accounts[accountIndex];
+      const entry = positionSums.get(account) ?? { total: 0, count: 0 };
       entry.total += position + 1; // 1-based rank
       entry.count += 1;
-      positionSums.set(model, entry);
+      positionSums.set(account, entry);
     }
   }
 
   const aggregate: AggregateRank[] = [];
-  for (const [model, { total, count }] of positionSums) {
+  for (const [account, { total, count }] of positionSums) {
     aggregate.push({
-      model,
+      account,
       averageRank: Math.round((total / count) * 100) / 100,
       rankCount: count,
     });
@@ -139,17 +204,13 @@ export class CouncilService {
   private config: CouncilServiceConfig;
   private callLLM: LLMCaller;
 
-  constructor(config: Partial<CouncilServiceConfig> & Pick<CouncilServiceConfig, "models" | "chairman">, llmCaller?: LLMCaller) {
+  constructor(config: Partial<CouncilServiceConfig> & Pick<CouncilServiceConfig, "members" | "chairman">, llmCaller?: LLMCaller) {
     this.config = { ...DEFAULT_COUNCIL_CONFIG, ...config };
 
     if (llmCaller) {
       this.callLLM = llmCaller;
     } else {
-      const apiKey = this.config.apiKey ?? process.env.OPENROUTER_API_KEY;
-      if (!apiKey) {
-        throw new Error("Council requires an OpenRouter API key (config.apiKey or OPENROUTER_API_KEY env var)");
-      }
-      this.callLLM = createOpenRouterCaller(apiKey, this.config.openRouterUrl);
+      throw new Error("Council requires an LLM caller (use createAccountCaller with registered accounts)");
     }
   }
 
@@ -168,7 +229,7 @@ export class CouncilService {
           consensusComplexity: "medium",
           consensusDurationMinutes: 30,
           consensusSkills: [],
-          recommendedApproach: "Unable to analyze — all models failed",
+          recommendedApproach: "Unable to analyze — all accounts failed",
           confidence: 0,
         },
       };
@@ -177,7 +238,7 @@ export class CouncilService {
     const peerRankings = await this.stage2_peerReview(goal, individualAnalyses);
     const aggregateRankings = calculateAggregateRankings(
       peerRankings,
-      individualAnalyses.map((a) => a.model),
+      individualAnalyses.map((a) => a.account),
     );
     const synthesis = await this.stage3_synthesize(goal, individualAnalyses, peerRankings);
 
@@ -197,14 +258,14 @@ export class CouncilService {
       : `Task: ${goal}`;
 
     const results = await Promise.allSettled(
-      this.config.models.map(async (model) => {
-        const response = await this.callLLM(model, STAGE1_SYSTEM_PROMPT, userPrompt);
+      this.config.members.map(async (account) => {
+        const response = await this.callLLM(account, STAGE1_SYSTEM_PROMPT, userPrompt);
         const parsed = parseJSONFromLLM(response);
         if (!parsed) {
-          throw new Error(`Failed to parse response from ${model}`);
+          throw new Error(`Failed to parse response from ${account}`);
         }
         return {
-          model,
+          account,
           complexity: parsed.complexity ?? "medium",
           estimatedDurationMinutes: parsed.estimatedDurationMinutes ?? 30,
           requiredSkills: parsed.requiredSkills ?? [],
@@ -229,14 +290,14 @@ export class CouncilService {
     const userPrompt = `Task: ${goal}\n\nHere are the analyses to review:\n\n${anonymized}`;
 
     const results = await Promise.allSettled(
-      this.config.models.map(async (model) => {
-        const response = await this.callLLM(model, STAGE2_SYSTEM_PROMPT, userPrompt);
+      this.config.members.map(async (account) => {
+        const response = await this.callLLM(account, STAGE2_SYSTEM_PROMPT, userPrompt);
         const parsed = parseJSONFromLLM(response);
         if (!parsed) {
-          throw new Error(`Failed to parse peer review from ${model}`);
+          throw new Error(`Failed to parse peer review from ${account}`);
         }
         return {
-          reviewer: model,
+          reviewer: account,
           ranking: parsed.ranking ?? [],
           reasoning: parsed.reasoning ?? "",
         } as CouncilRanking;
@@ -254,7 +315,7 @@ export class CouncilService {
     rankings: CouncilRanking[]
   ): Promise<CouncilAnalysis["synthesis"]> {
     const analysesText = analyses.map((a, i) => {
-      return `Analysis ${i + 1} (${a.model}):\n- Complexity: ${a.complexity}\n- Duration: ${a.estimatedDurationMinutes}min\n- Skills: ${a.requiredSkills.join(", ")}\n- Approach: ${a.recommendedApproach}\n- Risks: ${a.risks.join(", ")}\n- Suggested Provider: ${a.suggestedProvider ?? "none"}`;
+      return `Analysis ${i + 1} (${a.account}):\n- Complexity: ${a.complexity}\n- Duration: ${a.estimatedDurationMinutes}min\n- Skills: ${a.requiredSkills.join(", ")}\n- Approach: ${a.recommendedApproach}\n- Risks: ${a.risks.join(", ")}\n- Suggested Provider: ${a.suggestedProvider ?? "none"}`;
     }).join("\n\n");
 
     const rankingsText = rankings.map((r) => {

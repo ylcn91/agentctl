@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { Box, Text, useInput } from "ink";
 import { NavContext } from "../app.js";
+import { useTheme } from "../themes/index.js";
 import {
   loadTasks,
   saveTasks,
@@ -27,13 +28,6 @@ interface Props {
 type Mode = "browse" | "add" | "assign" | "reject" | "justify" | "search";
 
 const STATUS_ORDER: TaskStatus[] = ["todo", "in_progress", "ready_for_review", "accepted", "rejected"];
-const STATUS_COLORS: Record<TaskStatus, string> = {
-  todo: "yellow",
-  in_progress: "cyan",
-  ready_for_review: "magenta",
-  accepted: "green",
-  rejected: "red",
-};
 const STATUS_LABELS: Record<TaskStatus, string> = {
   todo: "To Do",
   in_progress: "In Progress",
@@ -43,6 +37,7 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
 };
 
 export function TaskBoard({ onNavigate, accounts = [] }: Props) {
+  const { colors } = useTheme();
   const [board, setBoard] = useState<TaskBoardData>({ tasks: [] });
   const [loading, setLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -53,12 +48,20 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
   const [frictionMessage, setFrictionMessage] = useState<{ text: string; color: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const STATUS_COLORS: Record<TaskStatus, string> = {
+    todo: colors.warning,
+    in_progress: colors.primary,
+    ready_for_review: colors.primaryMuted,
+    accepted: colors.success,
+    rejected: colors.error,
+  };
+
   const { setGlobalNavEnabled } = useContext(NavContext);
 
   useEffect(() => {
     setGlobalNavEnabled(false);
     return () => setGlobalNavEnabled(true);
-  }, []);
+  }, [setGlobalNavEnabled]);
 
   useEffect(() => {
     loadTasks().then((b) => {
@@ -106,7 +109,7 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
         try {
           const newBoard = acceptTask(board, task.id, value);
           persist(newBoard);
-          setFrictionMessage({ text: "Accepted with justification", color: "green" });
+          setFrictionMessage({ text: "Accepted with justification", color: colors.success });
         } catch (e: any) {
           console.error("[taskboard]", e.message);
         }
@@ -219,7 +222,7 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
           try {
             const newBoard = acceptTask(board, task.id);
             persist(newBoard);
-            setFrictionMessage({ text: "Auto-accepted", color: "green" });
+            setFrictionMessage({ text: "Auto-accepted", color: colors.success });
             setTimeout(() => setFrictionMessage(null), 3000);
           } catch (e: any) { console.error("[taskboard]", e.message); }
         } else if (gateResult.action === "require-acceptance") {
@@ -231,7 +234,7 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
           setInputBuffer("");
           setMode("justify");
         } else if (gateResult.action === "require-elevated-review") {
-          setFrictionMessage({ text: `BLOCKED: ${gateResult.reason}`, color: "red" });
+          setFrictionMessage({ text: `BLOCKED: ${gateResult.reason}`, color: colors.error });
           setTimeout(() => setFrictionMessage(null), 5000);
         }
       }
@@ -246,13 +249,13 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
     } else if (input === "s" && key.ctrl) {
       // Ctrl+s: explicit save
       persist(board);
-      setFrictionMessage({ text: "Saved", color: "green" });
+      setFrictionMessage({ text: "Saved", color: colors.success });
       setTimeout(() => setFrictionMessage(null), 2000);
     } else if (input === "r" && key.ctrl) {
       // Ctrl+r: reload tasks
       loadTasks().then((b) => {
         setBoard(b);
-        setFrictionMessage({ text: "Refreshed", color: "cyan" });
+        setFrictionMessage({ text: "Refreshed", color: colors.primary });
         setTimeout(() => setFrictionMessage(null), 2000);
       });
     } else if (key.escape) {
@@ -260,46 +263,46 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading tasks...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading tasks...</Text>;
 
   return (
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>Task Board</Text>
-        {sortByPrio && <Text color="yellow"> (sorted by priority)</Text>}
-        {searchQuery && <Text color="cyan"> filter: "{searchQuery}"</Text>}
-        <Text color="gray">  [/]search [a]dd [s]tatus [v]accept [x]reject [p]riority [Enter]assign [d]elete [Esc]back</Text>
+        {sortByPrio && <Text color={colors.warning}> (sorted by priority)</Text>}
+        {searchQuery && <Text color={colors.primary}> filter: "{searchQuery}"</Text>}
+        <Text color={colors.textMuted}>  [/]search [a]dd [s]tatus [v]accept [x]reject [p]riority [Enter]assign [d]elete [Esc]back</Text>
       </Box>
 
       {mode === "search" && (
         <Box marginBottom={1}>
-          <Text color="cyan">Search: </Text>
+          <Text color={colors.primary}>Search: </Text>
           <Text>{searchQuery}</Text>
-          <Text color="gray">_</Text>
+          <Text color={colors.textMuted}>_</Text>
         </Box>
       )}
 
       {mode === "add" && (
         <Box marginBottom={1}>
-          <Text color="cyan">New task: </Text>
+          <Text color={colors.primary}>New task: </Text>
           <Text>{inputBuffer}</Text>
-          <Text color="gray">_</Text>
+          <Text color={colors.textMuted}>_</Text>
         </Box>
       )}
 
       {mode === "reject" && (
         <Box marginBottom={1}>
-          <Text color="red">Rejection reason: </Text>
+          <Text color={colors.error}>Rejection reason: </Text>
           <Text>{inputBuffer}</Text>
-          <Text color="gray">_</Text>
+          <Text color={colors.textMuted}>_</Text>
         </Box>
       )}
 
       {mode === "justify" && (
         <Box marginBottom={1}>
-          <Text color="yellow">Justification required: </Text>
+          <Text color={colors.warning}>Justification required: </Text>
           <Text>{inputBuffer}</Text>
-          <Text color="gray">_</Text>
+          <Text color={colors.textMuted}>_</Text>
         </Box>
       )}
 
@@ -321,28 +324,28 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
               const isSelected = globalIdx === selectedIndex && mode === "browse";
               return (
                 <Box key={task.id} marginLeft={2}>
-                  <Text color={isSelected ? "white" : "gray"}>
+                  <Text color={isSelected ? colors.text : colors.textMuted}>
                     {isSelected ? "> " : "  "}
                   </Text>
-                  <Text color={isSelected ? "white" : undefined}>
-                    {task.priority && <Text color="red">[{task.priority}] </Text>}
+                  <Text color={isSelected ? colors.text : undefined}>
+                    {task.priority && <Text color={colors.error}>[{task.priority}] </Text>}
                     {task.title}
                   </Text>
                   {task.dueDate && (
-                    <Text color="gray"> due:{task.dueDate.slice(0, 10)}</Text>
+                    <Text color={colors.textMuted}> due:{task.dueDate.slice(0, 10)}</Text>
                   )}
                   {task.tags && task.tags.length > 0 && (
-                    <Text color="blue"> #{task.tags.join(" #")}</Text>
+                    <Text color={colors.info}> #{task.tags.join(" #")}</Text>
                   )}
                   {task.assignee && (
-                    <Text color="magenta"> @{task.assignee}</Text>
+                    <Text color={colors.primaryMuted}> @{task.assignee}</Text>
                   )}
                 </Box>
               );
             })}
             {tasks.length === 0 && (
               <Box marginLeft={2}>
-                <Text color="gray" dimColor>  (empty)</Text>
+                <Text color={colors.textMuted} dimColor>  (empty)</Text>
               </Box>
             )}
           </Box>
@@ -356,13 +359,13 @@ export function TaskBoard({ onNavigate, accounts = [] }: Props) {
           .map((t) => t.split(":")[1]);
         return (
           <Box flexDirection="column" marginTop={1}>
-            <Text bold color="cyan">Assign to:</Text>
+            <Text bold color={colors.primary}>Assign to:</Text>
             {accounts.map((acct, i) => {
               const fitScore = calculateProviderFit(acct, requiredSkills);
-              const scoreColor = fitScore > 70 ? "green" : fitScore >= 40 ? "yellow" : "red";
+              const scoreColor = fitScore > 70 ? colors.success : fitScore >= 40 ? colors.warning : colors.error;
               return (
                 <Box key={acct} marginLeft={2}>
-                  <Text color={i === assignIndex ? "white" : "gray"}>
+                  <Text color={i === assignIndex ? colors.text : colors.textMuted}>
                     {i === assignIndex ? "> " : "  "}{acct}
                   </Text>
                   {requiredSkills.length > 0 && (

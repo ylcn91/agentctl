@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { UsageBar } from "./UsageBar.js";
+import { useTheme } from "../themes/index.js";
 import { loadUsageData, type AccountUsageData } from "../application/use-cases/load-usage-data.js";
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function UsageDetail({ onNavigate }: Props) {
+  const { colors } = useTheme();
   const [accounts, setAccounts] = useState<AccountUsageData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAccount, setSelectedAccount] = useState(0);
@@ -29,13 +31,13 @@ export function UsageDetail({ onNavigate }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading usage data...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading usage data...</Text>;
 
   if (accounts.length === 0) {
     return (
       <Box flexDirection="column" paddingY={1}>
-        <Text color="gray">No accounts configured.</Text>
-        <Text color="gray">[Esc] Back</Text>
+        <Text color={colors.textMuted}>No accounts configured.</Text>
+        <Text color={colors.textMuted}>[Esc] Back</Text>
       </Box>
     );
   }
@@ -105,8 +107,8 @@ export function UsageDetail({ onNavigate }: Props) {
                   <Box width={6}>
                     <Text>{dayName}</Text>
                   </Box>
-                  <Text color="cyan">{"\u2588".repeat(barWidth)}</Text>
-                  <Text color="gray">{"\u2591".repeat(15 - barWidth)}</Text>
+                  <Text color={colors.primary}>{"\u2588".repeat(barWidth)}</Text>
+                  <Text color={colors.textMuted}>{"\u2591".repeat(15 - barWidth)}</Text>
                   <Text> {count}</Text>
                 </Box>
               );
@@ -129,8 +131,8 @@ export function UsageDetail({ onNavigate }: Props) {
                       <Box width={16}>
                         <Text>{shortName}</Text>
                       </Box>
-                      <Text color="magenta">{"\u2588".repeat(barWidth)}</Text>
-                      <Text color="gray">{"\u2591".repeat(15 - barWidth)}</Text>
+                      <Text color={colors.primaryMuted}>{"\u2588".repeat(barWidth)}</Text>
+                      <Text color={colors.textMuted}>{"\u2591".repeat(15 - barWidth)}</Text>
                       <Text> {pct}%</Text>
                     </Box>
                   );
@@ -141,7 +143,7 @@ export function UsageDetail({ onNavigate }: Props) {
       )}
 
       <Box marginTop={1}>
-        <Text color="gray">[Esc] Back [←/→] Page accounts</Text>
+        <Text color={colors.textMuted}>[Esc] Back [←/→] Page accounts</Text>
       </Box>
     </Box>
   );

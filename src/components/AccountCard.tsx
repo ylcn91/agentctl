@@ -1,6 +1,6 @@
-import React from "react";
 import { Box, Text } from "ink";
 import { QuotaBar } from "./QuotaBar.js";
+import { useTheme } from "../themes/index.js";
 import type { AgentStats, QuotaEstimate } from "../providers/types.js";
 import type { AccountConfig } from "../types.js";
 
@@ -21,15 +21,16 @@ export function AccountCard({
   unreadMessages,
   pairedWith,
 }: Props) {
+  const { colors } = useTheme();
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box>
         <Text color={account.color} bold>
           {account.name}
         </Text>
-        <Text color="gray"> ({account.label})</Text>
+        <Text color={colors.textMuted}> ({account.label})</Text>
         {pairedWith && (
-          <Text color="magenta" bold>
+          <Text color={colors.primaryMuted} bold>
             {"  "}PAIRED with {pairedWith}
           </Text>
         )}
@@ -40,12 +41,12 @@ export function AccountCard({
           </Text>
         )}
         {!stats.todayActivity && (
-          <Text color="gray">{"  "}Today: no activity</Text>
+          <Text color={colors.textMuted}>{"  "}Today: no activity</Text>
         )}
       </Box>
       {stats.todayTokens && (
         <Box marginLeft={2}>
-          <Text color="gray">
+          <Text color={colors.textMuted}>
             Tokens:{" "}
             {Object.entries(stats.todayTokens)
               .map(
@@ -61,12 +62,12 @@ export function AccountCard({
       </Box>
       {entireStatus && (
         <Box marginLeft={2}>
-          <Text color="gray">entire: {entireStatus}</Text>
+          <Text color={colors.textMuted}>entire: {entireStatus}</Text>
         </Box>
       )}
       {unreadMessages > 0 && (
         <Box marginLeft={2}>
-          <Text color="yellow">
+          <Text color={colors.warning}>
             inbox: {unreadMessages} new message(s)
           </Text>
         </Box>

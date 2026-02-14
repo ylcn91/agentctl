@@ -900,15 +900,10 @@ export function registerTools(server: McpServer, sendToDaemon: DaemonSender, acc
       return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Council feature is not enabled. Set features.council = true in config." }) }] };
     }
 
-    const { verifyTaskCompletion, needsCouncilVerification } = await import("../services/verification-council.js");
-    const { createOpenRouterCaller } = await import("../services/council.js");
+    const { verifyTaskCompletion } = await import("../services/verification-council.js");
+    const { createAccountCaller } = await import("../services/council.js");
 
-    const apiKey = config.council?.apiKey ?? process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Council verification requires an OpenRouter API key" }) }] };
-    }
-
-    const llmCaller = createOpenRouterCaller(apiKey);
+    const llmCaller = createAccountCaller(config.accounts);
 
     const result = await verifyTaskCompletion(
       args.taskId,
@@ -923,7 +918,7 @@ export function registerTools(server: McpServer, sendToDaemon: DaemonSender, acc
         acceptance_criteria: args.acceptance_criteria,
       },
       {
-        models: config.council?.models,
+        members: config.council?.members,
         chairman: config.council?.chairman,
         llmCaller,
       },

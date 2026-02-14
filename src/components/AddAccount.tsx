@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { useTheme } from "../themes/index.js";
 import TextInput from "ink-text-input";
 import SelectInput from "ink-select-input";
 import Spinner from "ink-spinner";
@@ -25,6 +26,7 @@ const optionItems = [
 ];
 
 export function AddAccount({ onDone, configPath }: Props) {
+  const { colors } = useTheme();
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
   const [dir, setDir] = useState("");
@@ -106,7 +108,7 @@ export function AddAccount({ onDone, configPath }: Props) {
 
   return (
     <Box flexDirection="column" paddingY={1}>
-      <Text bold color="magenta">Add Account</Text>
+      <Text bold color={colors.primaryMuted}>Add Account</Text>
 
       {step === "name" && (
         <Box flexDirection="column">
@@ -151,30 +153,30 @@ export function AddAccount({ onDone, configPath }: Props) {
           <Text>  Label: <Text bold>{label}</Text></Text>
           <Text>  Color: <Text bold color={color}>{color}</Text></Text>
           <Text>  Options: <Text bold>{setupOpt}</Text></Text>
-          <Text color="gray">Press Enter to confirm, or q to cancel.</Text>
+          <Text color={colors.textMuted}>Press Enter to confirm, or q to cancel.</Text>
           <TextInput value="" onChange={() => {}} onSubmit={handleConfirm} />
         </Box>
       )}
 
       {step === "running" && (
         <Box>
-          <Text color="cyan"><Spinner type="dots" /></Text>
+          <Text color={colors.primary}><Spinner type="dots" /></Text>
           <Text> Setting up account...</Text>
         </Box>
       )}
 
       {step === "done" && (
         <Box flexDirection="column">
-          <Text color="green">Done!</Text>
+          <Text color={colors.success}>Done!</Text>
           <Text>{result}</Text>
-          <Text color="gray">Press any key to return.</Text>
+          <Text color={colors.textMuted}>Press any key to return.</Text>
         </Box>
       )}
 
       {step === "error" && (
         <Box flexDirection="column">
-          <Text color="red">Error: {error}</Text>
-          <Text color="gray">Press any key to return.</Text>
+          <Text color={colors.error}>Error: {error}</Text>
+          <Text color={colors.textMuted}>Press any key to return.</Text>
         </Box>
       )}
     </Box>

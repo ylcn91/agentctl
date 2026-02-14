@@ -3,10 +3,12 @@ import { Box, Text } from "ink";
 import { existsSync } from "fs";
 import { getSockPath } from "../paths.js";
 import { loadConfig } from "../config.js";
+import { useTheme } from "../themes/index.js";
 
 const POLL_INTERVAL_MS = 5_000;
 
 export function StatusBar() {
+  const { colors } = useTheme();
   const [daemonUp, setDaemonUp] = useState(false);
   const [accountCount, setAccountCount] = useState(0);
 
@@ -28,20 +30,20 @@ export function StatusBar() {
   return (
     <Box
       borderStyle="single"
-      borderColor="gray"
+      borderColor={colors.border}
       paddingX={1}
       marginTop={1}
     >
-      <Text color={daemonUp ? "green" : "red"}>
+      <Text color={daemonUp ? colors.success : colors.error}>
         {daemonUp ? "daemon: connected" : "daemon: offline"}
       </Text>
-      <Text color="gray"> | </Text>
-      <Text color="gray">
+      <Text color={colors.textMuted}> | </Text>
+      <Text color={colors.textMuted}>
         accounts: {accountCount}
       </Text>
-      <Text color="gray"> | </Text>
-      <Text color="gray">
-        Ctrl+r refresh | ? help | q quit
+      <Text color={colors.textMuted}> | </Text>
+      <Text color={colors.textMuted}>
+        Ctrl+P palette | Ctrl+X t theme | ? help | q quit
       </Text>
     </Box>
   );

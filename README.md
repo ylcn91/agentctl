@@ -71,8 +71,8 @@ Pre-built binaries for macOS (arm64, x64) and Linux (x64) are attached to each [
 - **Analytics** — cycle times, accept/reject ratios, per-account productivity, SLA violations
 - **Live session sharing** — pair-programming sessions between accounts with real-time updates
 - **Session naming** — name, tag, and search sessions for future reference
-- **Multi-model council** — pre-delegation task analysis using multiple LLMs via OpenRouter
-- **Council verification** — multi-LLM review of completed work against acceptance criteria
+- **Multi-model council** — pre-delegation task analysis using registered accounts' CLI tools (no external API required)
+- **Council verification** — multi-account review of completed work against acceptance criteria
 - **Trust & reputation** — track agent completion rate, SLA compliance, and quality metrics
 - **Progress tracking** — agents report intermediate progress for proactive monitoring
 - **Workflow automation** — YAML-based DAG workflows with steps, conditions, and retries
@@ -82,6 +82,9 @@ Pre-built binaries for macOS (arm64, x64) and Linux (x64) are attached to each [
 - **Circuit breaker** — failure handling for agent reliability
 - **Daemon supervisor** — auto-restart and health watchdog for the daemon process
 - **Session replay** — replay Entire checkpoint transcripts with timeline visualization
+- **15 built-in themes** — catppuccin-mocha (default), tokyonight, dracula, gruvbox, nord, solarized, and more
+- **Command palette** — fuzzy-search overlay (`Ctrl+P`) for quick access to all views and actions
+- **Info sidebar** — right-side panel (`Ctrl+X b`) showing daemon status, account count, and version
 
 ---
 
@@ -255,6 +258,26 @@ Run `actl` with no arguments to open the interactive dashboard.
 | `Escape` | Back to dashboard |
 | `q` | Quit |
 | `?` | Toggle help overlay |
+| `Ctrl+P` | Open command palette |
+| `Ctrl+X b` | Toggle info sidebar |
+| `Ctrl+X p` | Open command palette (leader key) |
+
+### Command Palette
+
+Press `Ctrl+P` (or `Ctrl+X p`) to open the command palette. It provides fuzzy-search access to all views and actions. Type to filter, use arrow keys to navigate, and press Enter to select.
+
+### Info Sidebar
+
+Press `Ctrl+X b` to toggle the info sidebar. It displays:
+- Daemon connection status
+- Number of registered accounts
+- Current version
+
+### Leader Key System
+
+`Ctrl+X` acts as a leader key prefix with a 500ms chord timeout:
+- `Ctrl+X b` — toggle sidebar
+- `Ctrl+X p` — open command palette
 
 ---
 
@@ -613,27 +636,26 @@ Press `w` in the dashboard to view workflow executions.
 
 ## Multi-Model Council
 
-When the `council` feature flag is enabled, agentctl can analyze tasks using multiple LLM models and reach consensus on approach, complexity, and provider selection.
+When the `council` feature flag is enabled, agentctl can analyze tasks using multiple registered accounts and reach consensus on approach, complexity, and provider selection.
 
 ### How It Works
 
-1. Task goal is sent to multiple models via OpenRouter
-2. Each model returns analysis (complexity, duration, skills, risks)
-3. Models rank each other's responses
-4. Chairman model synthesizes consensus
+1. Task goal is sent to multiple registered accounts via their CLI tools in non-interactive mode (e.g., `claude -p`, `codex -q`, `opencode run`)
+2. Each account returns analysis (complexity, duration, skills, risks)
+3. Accounts rank each other's responses
+4. Chairman account synthesizes consensus
 
 ### Council Verification
 
-The `verify_task` tool runs multi-LLM council verification on completed work. Multiple models independently review the diff against the goal and acceptance criteria, then a chairman produces a final verdict: ACCEPT, REJECT, or ACCEPT_WITH_NOTES.
+The `verify_task` tool runs multi-account council verification on completed work. Multiple accounts independently review the diff against the goal and acceptance criteria, then a chairman produces a final verdict: ACCEPT, REJECT, or ACCEPT_WITH_NOTES.
 
 ### Configuration
 
 ```json
 {
   "council": {
-    "models": ["anthropic/claude-3.5-sonnet", "google/gemini-2.0-flash"],
-    "chairman": "anthropic/claude-3.5-sonnet",
-    "apiKey": "your-openrouter-key"
+    "members": ["claude", "codex", "opencode"],
+    "chairman": "claude-admin"
   }
 }
 ```
@@ -802,6 +824,38 @@ Press `i` in the dashboard to view Entire sessions.
 
 ---
 
+## Themes
+
+agentctl ships with 15 built-in themes. Set your theme via:
+
+```bash
+actl config set theme "tokyonight"
+```
+
+### Available Themes
+
+| Theme | Style |
+|-------|-------|
+| `catppuccin-mocha` | Dark (default) |
+| `catppuccin-latte` | Light |
+| `tokyonight` | Dark |
+| `tokyonight-storm` | Dark |
+| `dracula` | Dark |
+| `gruvbox-dark` | Dark |
+| `gruvbox-light` | Light |
+| `nord` | Dark |
+| `one-dark` | Dark |
+| `solarized-dark` | Dark |
+| `solarized-light` | Light |
+| `github-dark` | Dark |
+| `github-light` | Light |
+| `rose-pine` | Dark |
+| `rose-pine-moon` | Dark |
+
+All 24 TUI components use the `useTheme()` hook and respond to theme changes immediately.
+
+---
+
 ## Configuration
 
 Config file: `~/.agentctl/config.json`
@@ -857,10 +911,10 @@ Config file: `~/.agentctl/config.json`
     defaultOwner: "your-org",
     defaultRepo: "your-repo"
   },
+  theme?: "catppuccin-mocha",           // any of the 15 built-in themes
   council?: {
-    models: ["anthropic/claude-3.5-sonnet", "google/gemini-2.0-flash"],
-    chairman: "anthropic/claude-3.5-sonnet",
-    apiKey: "your-openrouter-key"
+    members: ["claude", "codex", "opencode"],
+    chairman: "claude-admin"
   },
   delegationDepth?: {
     maxDepth: 3
@@ -1018,7 +1072,13 @@ agentctl/
 │   │   ├── VerificationView.tsx   # Task verification receipts
 │   │   ├── EntireSessions.tsx     # Claude Enterprise sessions
 │   │   ├── DelegationChain.tsx    # Delegation chain tracking
-│   │   └── HelpOverlay.tsx        # Keyboard shortcut help
+│   │   ├── HelpOverlay.tsx        # Keyboard shortcut help
+│   │   ├── CommandPalette.tsx     # Fuzzy-search command palette
+│   │   └── Sidebar.tsx            # Info sidebar panel
+│   ├── themes/
+│   │   ├── types.ts               # Theme type definitions
+│   │   ├── definitions.ts         # 15 built-in theme definitions
+│   │   └── index.ts               # Theme exports & useTheme hook
 │   ├── daemon/
 │   │   ├── server.ts             # Unix socket daemon
 │   │   ├── state.ts              # In-memory daemon state

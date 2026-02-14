@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { Box, Text, useInput } from "ink";
 import { NavContext } from "../app.js";
+import { useTheme } from "../themes/index.js";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import type { EntireSessionMetrics, EntirePhase, EntireTokenUsage } from "../services/entire-adapter.js";
@@ -11,12 +12,7 @@ interface Props {
   onNavigate: (view: string) => void;
 }
 
-const PHASE_COLORS: Record<string, string> = {
-  active: "cyan",
-  active_committed: "cyan",
-  idle: "yellow",
-  ended: "gray",
-};
+// PHASE_COLORS moved inside component to use theme
 
 const CONTEXT_WINDOWS: Record<string, number> = {
   "Claude Code": 200_000,
@@ -123,11 +119,19 @@ function loadAllSessionMetrics(): EntireSessionMetrics[] {
 }
 
 export function EntireSessions({ onNavigate }: Props) {
+  const { colors } = useTheme();
   const [sessions, setSessions] = useState<EntireSessionMetrics[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
   const { refreshTick: globalRefresh } = useContext(NavContext);
+
+  const PHASE_COLORS: Record<string, string> = {
+    active: colors.primary,
+    active_committed: colors.primary,
+    idle: colors.warning,
+    ended: colors.textMuted,
+  };
 
   useEffect(() => {
     if (globalRefresh > 0) setRefreshTick((prev) => prev + 1);
@@ -163,7 +167,7 @@ export function EntireSessions({ onNavigate }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading entire.io session data...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading entire.io session data...</Text>;
 
   const activeCount = sessions.filter(
     (s) => s.phase === "active" || s.phase === "active_committed",
@@ -177,16 +181,16 @@ export function EntireSessions({ onNavigate }: Props) {
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>Entire Sessions</Text>
-        <Text color="gray">  [r]efresh [up/down]navigate [Esc]back  </Text>
+        <Text color={colors.textMuted}>  [r]efresh [up/down]navigate [Esc]back  </Text>
         <Text>{sessions.length} total</Text>
-        <Text color="gray"> | </Text>
-        <Text color="cyan">{activeCount} active</Text>
-        <Text color="gray"> | </Text>
-        <Text color="yellow">~{Math.round(avgBurnRate)} tok/min avg</Text>
+        <Text color={colors.textMuted}> | </Text>
+        <Text color={colors.primary}>{activeCount} active</Text>
+        <Text color={colors.textMuted}> | </Text>
+        <Text color={colors.warning}>~{Math.round(avgBurnRate)} tok/min avg</Text>
       </Box>
 
       {sessions.length === 0 ? (
-        <Text color="gray">
+        <Text color={colors.textMuted}>
           No entire.io sessions detected. Start an AI coding session to see live
           metrics.
         </Text>
@@ -201,41 +205,41 @@ export function EntireSessions({ onNavigate }: Props) {
           return (
             <Box key={s.sessionId} flexDirection="column" marginLeft={1} marginBottom={idx < sessions.length - 1 ? 1 : 0}>
               <Box>
-                <Text color={idx === selectedIndex ? "white" : "gray"}>
+                <Text color={idx === selectedIndex ? colors.text : colors.textMuted}>
                   {idx === selectedIndex ? "> " : "  "}
                 </Text>
                 <Text bold={idx === selectedIndex}>
                   {s.sessionId.slice(0, 8)}
                 </Text>
                 <Text> </Text>
-                <Text color={PHASE_COLORS[s.phase] ?? "gray"}>
+                <Text color={PHASE_COLORS[s.phase] ?? colors.textMuted}>
                   [{phaseLabel}]
                 </Text>
                 <Text> </Text>
-                <Text color="magenta">{s.agentType}</Text>
-                <Text color="gray">
+                <Text color={colors.primaryMuted}>{s.agentType}</Text>
+                <Text color={colors.textMuted}>
                   {" "}steps:{s.stepCount} files:{s.filesTouched.length}
                 </Text>
               </Box>
               {idx === selectedIndex && (
                 <Box marginLeft={4} flexDirection="column">
                   <Box>
-                    <Text color="gray">tokens: </Text>
+                    <Text color={colors.textMuted}>tokens: </Text>
                     <Text>{formatTokens(s.totalTokens)}</Text>
-                    <Text color="gray"> burn: </Text>
-                    <Text color="yellow">{Math.round(s.tokenBurnRate)}/min</Text>
-                    <Text color="gray">  elapsed: </Text>
+                    <Text color={colors.textMuted}> burn: </Text>
+                    <Text color={colors.warning}>{Math.round(s.tokenBurnRate)}/min</Text>
+                    <Text color={colors.textMuted}>  elapsed: </Text>
                     <Text>{formatElapsed(s.elapsedMinutes)}</Text>
                   </Box>
                   <Box>
-                    <Text color="gray">context: </Text>
+                    <Text color={colors.textMuted}>context: </Text>
                     <Text
                       color={
                         s.contextSaturation > 0.8
-                          ? "red"
+                          ? colors.error
                           : s.contextSaturation > 0.5
-                            ? "yellow"
-                            : "green"
+                            ? colors.warning
+                            : colors.success
                       }
                     >
                       {saturationBar(s.contextSaturation)}

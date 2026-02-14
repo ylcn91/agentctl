@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import SelectInput from "ink-select-input";
 import TextInput from "ink-text-input";
 import { loadConfig } from "../config.js";
 import { getEntireCheckpoints, isEntireInstalled } from "../services/entire.js";
 import { launchAccount } from "../application/use-cases/launch-account.js";
+import { useTheme } from "../themes/index.js";
 import type { AccountConfig } from "../types.js";
 import type { EntireCheckpoint } from "../services/entire.js";
 
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function Launcher({ onNavigate }: Props) {
+  const { colors } = useTheme();
   const [step, setStep] = useState<Step>("account");
   const [accounts, setAccounts] = useState<AccountConfig[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<AccountConfig | null>(null);
@@ -141,8 +143,8 @@ export function Launcher({ onNavigate }: Props) {
   if (error) {
     return (
       <Box flexDirection="column" paddingY={1}>
-        <Text color="red">Error: {error}</Text>
-        <Text color="gray">[Esc] Back</Text>
+        <Text color={colors.error}>Error: {error}</Text>
+        <Text color={colors.textMuted}>[Esc] Back</Text>
       </Box>
     );
   }
@@ -151,8 +153,8 @@ export function Launcher({ onNavigate }: Props) {
     if (accounts.length === 0) {
       return (
         <Box flexDirection="column" paddingY={1}>
-          <Text color="gray">No accounts configured. Press [a] to add one.</Text>
-          <Text color="gray">[Esc] Back</Text>
+          <Text color={colors.textMuted}>No accounts configured. Press [a] to add one.</Text>
+          <Text color={colors.textMuted}>[Esc] Back</Text>
         </Box>
       );
     }
@@ -166,7 +168,7 @@ export function Launcher({ onNavigate }: Props) {
       <Box flexDirection="column" paddingY={1}>
         <Text bold>Select account:</Text>
         <SelectInput items={items} onSelect={handleAccountSelect} />
-        <Text color="gray">[Esc] Back</Text>
+        <Text color={colors.textMuted}>[Esc] Back</Text>
       </Box>
     );
   }
@@ -181,7 +183,7 @@ export function Launcher({ onNavigate }: Props) {
           <Text>Directory: </Text>
           <TextInput value={directory} onChange={setDirectory} onSubmit={handleDirectorySubmit} />
         </Box>
-        <Text color="gray">[Enter] Confirm  [Esc] Back</Text>
+        <Text color={colors.textMuted}>[Enter] Confirm  [Esc] Back</Text>
       </Box>
     );
   }
@@ -204,11 +206,11 @@ export function Launcher({ onNavigate }: Props) {
           <Text bold>Options:</Text>
           {optionsList.map((opt, i) => (
             <Box key={opt.key}>
-              <Text color={i === optionIndex ? "cyan" : undefined}>
+              <Text color={i === optionIndex ? colors.primary : undefined}>
                 {i === optionIndex ? "> " : "  "}
                 [{options[opt.key] ? "x" : " "}] {opt.label}
                 {opt.key === "autoEntire" && !entireAvailable ? (
-                  <Text color="gray"> (not installed)</Text>
+                  <Text color={colors.textMuted}> (not installed)</Text>
                 ) : null}
               </Text>
             </Box>
@@ -219,7 +221,7 @@ export function Launcher({ onNavigate }: Props) {
             <Text bold>Entire checkpoints:</Text>
             {checkpoints.slice(0, 5).map((cp) => (
               <Box key={cp.checkpointId} marginLeft={2}>
-                <Text color="gray">
+                <Text color={colors.textMuted}>
                   {cp.checkpointId.slice(0, 8)} | {cp.branch} |{" "}
                   {cp.filesTouched.length} files
                 </Text>
@@ -228,7 +230,7 @@ export function Launcher({ onNavigate }: Props) {
           </Box>
         )}
         <Box marginTop={1}>
-          <Text color="gray">[Space] Toggle  [Enter] Launch  [Esc] Back</Text>
+          <Text color={colors.textMuted}>[Space] Toggle  [Enter] Launch  [Esc] Back</Text>
         </Box>
       </Box>
     );
@@ -247,7 +249,7 @@ export function Launcher({ onNavigate }: Props) {
       <Box flexDirection="column" paddingY={1}>
         <Text bold>Select checkpoint to resume:</Text>
         <SelectInput items={items} onSelect={handleCheckpointSelect} />
-        <Text color="gray">[Enter] Select  [Esc] Back</Text>
+        <Text color={colors.textMuted}>[Enter] Select  [Esc] Back</Text>
       </Box>
     );
   }
@@ -255,8 +257,8 @@ export function Launcher({ onNavigate }: Props) {
   // Launching step
   return (
     <Box flexDirection="column" paddingY={1}>
-      <Text color="green">{launchStatus || "Launching..."}</Text>
-      <Text color="gray">[Esc] Back to dashboard</Text>
+      <Text color={colors.success}>{launchStatus || "Launching..."}</Text>
+      <Text color={colors.textMuted}>[Esc] Back to dashboard</Text>
     </Box>
   );
 }

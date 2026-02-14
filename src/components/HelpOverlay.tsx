@@ -1,4 +1,5 @@
 import { Box, Text } from "ink";
+import { useTheme } from "../themes/index.js";
 
 interface ShortcutGroup {
   title: string;
@@ -12,6 +13,10 @@ const GLOBAL_SHORTCUTS: ShortcutGroup = {
     { key: "q", description: "Quit" },
     { key: "?", description: "Toggle this help" },
     { key: "Ctrl+r", description: "Refresh current view" },
+    { key: "Ctrl+P", description: "Command Palette" },
+    { key: "Ctrl+X", description: "Leader Key" },
+    { key: "Ctrl+X b", description: "Toggle Sidebar" },
+    { key: "Ctrl+X t", description: "Theme Picker" },
   ],
 };
 
@@ -168,6 +173,7 @@ interface Props {
 }
 
 export function HelpOverlay({ view, visible }: Props) {
+  const { colors } = useTheme();
   if (!visible) return null;
 
   const viewGroup = VIEW_SHORTCUTS[view];
@@ -178,23 +184,23 @@ export function HelpOverlay({ view, visible }: Props) {
     <Box
       flexDirection="column"
       borderStyle="double"
-      borderColor="yellow"
+      borderColor={colors.warning}
       paddingX={2}
       paddingY={1}
       marginY={1}
     >
-      <Text bold color="yellow">Keyboard Shortcuts</Text>
-      <Text color="gray">Press ? or Esc to close</Text>
+      <Text bold color={colors.warning}>Keyboard Shortcuts</Text>
+      <Text color={colors.textMuted}>Press ? or Esc to close</Text>
       <Text> </Text>
       {groups.map((group) => (
         <Box key={group.title} flexDirection="column" marginBottom={1}>
-          <Text bold color="cyan">{group.title}</Text>
+          <Text bold color={colors.primary}>{group.title}</Text>
           {group.shortcuts.map((s) => (
             <Box key={s.key} marginLeft={2}>
               <Box width={12}>
-                <Text color="white" bold>{s.key}</Text>
+                <Text color={colors.text} bold>{s.key}</Text>
               </Box>
-              <Text color="gray">{s.description}</Text>
+              <Text color={colors.textMuted}>{s.description}</Text>
             </Box>
           ))}
         </Box>

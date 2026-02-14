@@ -61,7 +61,8 @@ CLI (meow) -> TUI (Ink/React) -> Services -> Daemon (Unix socket) -> MCP bridge
 Key directories:
 - `src/cli.tsx` -- CLI entry point & command router (20+ subcommands)
 - `src/app.tsx` -- TUI root (Ink)
-- `src/components/` -- Dashboard, TaskBoard, MessageInbox, SLABoard, CouncilPanel, DelegationChain, HealthDashboard, HelpOverlay, VerificationView, WorkflowBoard, WorkflowDetail, Analytics, PromptLibrary, EntireSessions, etc.
+- `src/components/` -- Dashboard, TaskBoard, MessageInbox, SLABoard, CouncilPanel, DelegationChain, HealthDashboard, HelpOverlay, VerificationView, WorkflowBoard, WorkflowDetail, Analytics, PromptLibrary, EntireSessions, CommandPalette, Sidebar, etc.
+- `src/themes/` -- Theme system: `types.ts` (theme type definitions), `definitions.ts` (15 built-in themes), `index.ts` (exports & useTheme hook)
 - `src/daemon/` -- Unix socket server, state, framing, stores (message, workspace, capability, knowledge, session, trust), health-monitor, watchdog, supervisor, config-watcher, shared-session
 - `src/mcp/` -- MCP bridge (`bridge.ts`) + 56 tool registrations (`tools.ts`)
 - `src/services/` -- Business logic (48 modules): account-manager, tasks, handoff, sla-engine, council, event-bus, circuit-breaker, cognitive-friction, verification-council, verification-receipts, adaptive-coordinator, progress-tracker, delegation-depth, provider-profiles, input-sanitizer, workflow-engine, workflow-parser, retro-engine, analytics, etc.
@@ -84,7 +85,10 @@ Key directories:
 - **Paths**: All file paths computed in `src/paths.ts` via getter functions. Override base dir with `AGENTCTL_DIR` env var. Paths include: config, socket, PID, tokens, messages, workspaces, capabilities, knowledge, prompts, handoff-templates, clipboard, external-links, review-bundles, activity, workflow, retro, sessions, trust, receipt-key
 - **Task lifecycle**: `todo -> in_progress -> ready_for_review -> accepted/rejected`. Rejection bounces back to `in_progress` automatically. Enforced transitions in `src/services/tasks.ts` via `VALID_TRANSITIONS` map. Tasks support priority (P0/P1/P2), due dates, tags, workspace context, and event history
 - **Event bus**: `src/services/event-bus.ts` defines a discriminated union of delegation lifecycle events (TASK_CREATED, TASK_ASSIGNED, CHECKPOINT_REACHED, PROGRESS_UPDATE, etc.). Used for observability across the system
-- **Council**: Multi-model LLM analysis (`src/services/council.ts`) and verification (`src/services/verification-council.ts`). Uses OpenRouter API. Feature-gated on `council` flag
+- **Council**: Multi-account analysis (`src/services/council.ts`) and verification (`src/services/verification-council.ts`). Uses registered accounts' CLI tools in non-interactive mode (e.g., `claude -p`, `codex -q`, `opencode run`). Config: `council.members` (array of account names), `council.chairman` (chairman account). Feature-gated on `council` flag
+- **Themes**: 15 built-in themes in `src/themes/`. Config: `theme?: string` field in HubConfig. Set via `actl config set theme "tokyonight"`. All 24 components use `useTheme()` hook
+- **Command Palette**: `Ctrl+P` opens fuzzy-search overlay for all views and actions (`src/components/CommandPalette.tsx`)
+- **Leader Keys**: `Ctrl+X` prefix with 500ms chord timeout. `Ctrl+X b` toggles info sidebar, `Ctrl+X p` opens command palette
 - **Input sanitizer**: `src/services/input-sanitizer.ts` -- validate/sanitize all external inputs
 
 ## MCP Tools (56 registered)

@@ -43,14 +43,13 @@ export interface GitHubConfig {
 }
 
 export interface CouncilConfig {
-  models: string[];
+  members: string[];
   chairman: string;
-  apiKey?: string;
 }
 
 // Council analysis result types
 export interface CouncilResponse {
-  model: string;
+  account: string;
   complexity: "low" | "medium" | "high" | "critical";
   estimatedDurationMinutes: number;
   requiredSkills: string[];
@@ -66,7 +65,7 @@ export interface CouncilRanking {
 }
 
 export interface AggregateRank {
-  model: string;
+  account: string;
   averageRank: number;
   rankCount: number;
 }
@@ -87,6 +86,7 @@ export interface HubConfig {
   features?: FeatureFlags;
   github?: GitHubConfig;
   council?: CouncilConfig;
+  theme?: string;
   delegationDepth?: { maxDepth?: number };
   defaults: {
     launchInNewWindow: boolean;

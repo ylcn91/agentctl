@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { Box, Text, useInput } from "ink";
 import { NavContext } from "../app.js";
+import { useTheme } from "../themes/index.js";
 import { atomicRead } from "../services/file-store.js";
 import { getHubDir } from "../paths.js";
 import type { CouncilAnalysis } from "../services/council.js";
@@ -15,18 +16,7 @@ const STAGE_LABELS = [
   "Stage 3: Chairman Synthesis",
 ];
 
-const COMPLEXITY_COLORS: Record<string, string> = {
-  low: "green",
-  medium: "yellow",
-  high: "red",
-  critical: "magenta",
-};
-
-function confidenceColor(c: number): string {
-  if (c >= 0.8) return "green";
-  if (c >= 0.5) return "yellow";
-  return "red";
-}
+// COMPLEXITY_COLORS and confidenceColor moved inside components to use theme
 
 function confidenceBar(c: number, width = 20): string {
   const filled = Math.round(c * width);
@@ -42,12 +32,26 @@ interface CouncilCache {
 }
 
 export function CouncilPanel({ onNavigate }: Props) {
+  const { colors } = useTheme();
   const [analyses, setAnalyses] = useState<CouncilAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [detailView, setDetailView] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const { refreshTick: globalRefresh } = useContext(NavContext);
+
+  const COMPLEXITY_COLORS: Record<string, string> = {
+    low: colors.success,
+    medium: colors.warning,
+    high: colors.error,
+    critical: colors.primaryMuted,
+  };
+
+  function confidenceColor(c: number): string {
+    if (c >= 0.8) return colors.success;
+    if (c >= 0.5) return colors.warning;
+    return colors.error;
+  }
 
   useEffect(() => {
     if (globalRefresh > 0) setRefreshTick((prev) => prev + 1);
@@ -100,17 +104,17 @@ export function CouncilPanel({ onNavigate }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading council analyses...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading council analyses...</Text>;
 
   if (analyses.length === 0) {
     return (
       <Box flexDirection="column" paddingY={1}>
         <Box marginBottom={1}>
           <Text bold>Council Panel</Text>
-          <Text color="gray">  [r]efresh [Esc]back</Text>
+          <Text color={colors.textMuted}>  [r]efresh [Esc]back</Text>
         </Box>
-        <Text color="gray">No council analyses found.</Text>
-        <Text color="gray" dimColor>
+        <Text color={colors.textMuted}>No council analyses found.</Text>
+        <Text color={colors.textMuted} dimColor>
           Run a council analysis via the daemon or CLI to see results here.
         </Text>
       </Box>
@@ -120,7 +124,7 @@ export function CouncilPanel({ onNavigate }: Props) {
   // Detail view: show a single analysis in depth
   if (detailView) {
     const analysis = analyses[selectedIndex] ?? analyses[0];
-    return <AnalysisDetail analysis={analysis} selectedIndex={selectedIndex} />;
+    return <AnalysisDetail analysis={analysis} selectedIndex={selectedIndex} colors={colors} />;
   }
 
   // List view: show all cached analyses
@@ -128,7 +132,7 @@ export function CouncilPanel({ onNavigate }: Props) {
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>Council Panel</Text>
-        <Text color="gray">  [Enter]detail [r]efresh [Esc]back</Text>
+        <Text color={colors.textMuted}>  [Enter]detail [r]efresh [Esc]back</Text>
       </Box>
 
       {analyses.map((a, idx) => {
@@ -137,29 +141,29 @@ export function CouncilPanel({ onNavigate }: Props) {
         return (
           <Box key={idx} marginLeft={1} flexDirection="column">
             <Box>
-              <Text color={isSelected ? "white" : "gray"}>
+              <Text color={isSelected ? colors.text : colors.textMuted}>
                 {isSelected ? "> " : "  "}
               </Text>
-              <Text color={isSelected ? "white" : undefined} bold={isSelected}>
+              <Text color={isSelected ? colors.text : undefined} bold={isSelected}>
                 {a.taskGoal.length > 60
                   ? a.taskGoal.slice(0, 57) + "..."
                   : a.taskGoal}
               </Text>
-              <Text color="gray"> | </Text>
-              <Text color={COMPLEXITY_COLORS[synth.consensusComplexity] ?? "white"}>
+              <Text color={colors.textMuted}> | </Text>
+              <Text color={COMPLEXITY_COLORS[synth.consensusComplexity] ?? colors.text}>
                 {synth.consensusComplexity.toUpperCase()}
               </Text>
-              <Text color="gray"> | </Text>
+              <Text color={colors.textMuted}> | </Text>
               <Text color={confidenceColor(synth.confidence)}>
                 {(synth.confidence * 100).toFixed(0)}%
               </Text>
               {synth.recommendedProvider && (
-                <Text color="cyan"> @{synth.recommendedProvider}</Text>
+                <Text color={colors.primary}> @{synth.recommendedProvider}</Text>
               )}
             </Box>
             <Box marginLeft={4}>
-              <Text color="gray" dimColor>
-                {a.timestamp.slice(0, 16).replace("T", " ")} | {a.individualAnalyses.length} models | {a.peerRankings.length} reviews
+              <Text color={colors.textMuted} dimColor>
+                {a.timestamp.slice(0, 16).replace("T", " ")} | {a.individualAnalyses.length} accounts | {a.peerRankings.length} reviews
               </Text>
             </Box>
           </Box>
@@ -168,7 +172,7 @@ export function CouncilPanel({ onNavigate }: Props) {
 
       {/* Pipeline overview */}
       <Box marginTop={1} flexDirection="column">
-        <Text bold color="gray">Pipeline Stages</Text>
+        <Text bold color={colors.textMuted}>Pipeline Stages</Text>
         {STAGE_LABELS.map((label, idx) => {
           const latest = analyses[0];
           let done = false;
@@ -177,7 +181,7 @@ export function CouncilPanel({ onNavigate }: Props) {
           if (idx === 2) done = latest.synthesis.confidence > 0;
           return (
             <Box key={idx} marginLeft={2}>
-              <Text color={done ? "green" : "gray"}>
+              <Text color={done ? colors.success : colors.textMuted}>
                 {done ? "[x]" : "[ ]"} {label}
               </Text>
             </Box>
@@ -191,22 +195,37 @@ export function CouncilPanel({ onNavigate }: Props) {
 function AnalysisDetail({
   analysis,
   selectedIndex,
+  colors,
 }: {
   analysis: CouncilAnalysis;
   selectedIndex: number;
+  colors: Record<string, string>;
 }) {
   const synth = analysis.synthesis;
+
+  const COMPLEXITY_COLORS: Record<string, string> = {
+    low: colors.success,
+    medium: colors.warning,
+    high: colors.error,
+    critical: colors.primaryMuted,
+  };
+
+  function confidenceColor(c: number): string {
+    if (c >= 0.8) return colors.success;
+    if (c >= 0.5) return colors.warning;
+    return colors.error;
+  }
 
   return (
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>Council Analysis Detail</Text>
-        <Text color="gray">  [Esc]back</Text>
+        <Text color={colors.textMuted}>  [Esc]back</Text>
       </Box>
 
       {/* Task goal */}
       <Box marginBottom={1}>
-        <Text bold color="cyan">Goal: </Text>
+        <Text bold color={colors.primary}>Goal: </Text>
         <Text>{analysis.taskGoal}</Text>
       </Box>
 
@@ -216,7 +235,7 @@ function AnalysisDetail({
         <Box marginLeft={2} flexDirection="column">
           <Box>
             <Text>Complexity: </Text>
-            <Text color={COMPLEXITY_COLORS[synth.consensusComplexity] ?? "white"} bold>
+            <Text color={COMPLEXITY_COLORS[synth.consensusComplexity] ?? colors.text} bold>
               {synth.consensusComplexity.toUpperCase()}
             </Text>
           </Box>
@@ -233,13 +252,13 @@ function AnalysisDetail({
           {synth.recommendedProvider && (
             <Box>
               <Text>Provider: </Text>
-              <Text color="cyan">{synth.recommendedProvider}</Text>
+              <Text color={colors.primary}>{synth.recommendedProvider}</Text>
             </Box>
           )}
           {synth.consensusSkills.length > 0 && (
             <Box>
               <Text>Skills: </Text>
-              <Text color="gray">{synth.consensusSkills.join(", ")}</Text>
+              <Text color={colors.textMuted}>{synth.consensusSkills.join(", ")}</Text>
             </Box>
           )}
           <Box>
@@ -248,44 +267,44 @@ function AnalysisDetail({
           </Box>
           {synth.dissenting_views && synth.dissenting_views.length > 0 && (
             <Box flexDirection="column">
-              <Text color="yellow">Dissenting Views:</Text>
+              <Text color={colors.warning}>Dissenting Views:</Text>
               {synth.dissenting_views.map((v, i) => (
-                <Text key={i} color="yellow" dimColor>  - {v}</Text>
+                <Text key={i} color={colors.warning} dimColor>  - {v}</Text>
               ))}
             </Box>
           )}
         </Box>
       </Box>
 
-      {/* Individual model responses */}
+      {/* Individual account responses */}
       <Box flexDirection="column" marginBottom={1}>
-        <Text bold>Model Responses ({analysis.individualAnalyses.length})</Text>
+        <Text bold>Account Responses ({analysis.individualAnalyses.length})</Text>
         {analysis.individualAnalyses.map((resp, idx) => {
           const isSelected = idx === selectedIndex;
           return (
             <Box key={idx} marginLeft={2} flexDirection="column">
               <Box>
-                <Text color={isSelected ? "white" : "gray"}>
+                <Text color={isSelected ? colors.text : colors.textMuted}>
                   {isSelected ? "> " : "  "}
                 </Text>
-                <Text color={isSelected ? "white" : undefined} bold={isSelected}>
-                  {resp.model}
+                <Text color={isSelected ? colors.text : undefined} bold={isSelected}>
+                  {resp.account}
                 </Text>
-                <Text color="gray"> | </Text>
-                <Text color={COMPLEXITY_COLORS[resp.complexity] ?? "white"}>
+                <Text color={colors.textMuted}> | </Text>
+                <Text color={COMPLEXITY_COLORS[resp.complexity] ?? colors.text}>
                   {resp.complexity}
                 </Text>
-                <Text color="gray"> | {resp.estimatedDurationMinutes}min</Text>
+                <Text color={colors.textMuted}> | {resp.estimatedDurationMinutes}min</Text>
                 {resp.suggestedProvider && (
-                  <Text color="cyan"> @{resp.suggestedProvider}</Text>
+                  <Text color={colors.primary}> @{resp.suggestedProvider}</Text>
                 )}
               </Box>
               {isSelected && (
                 <Box marginLeft={4} flexDirection="column">
                   <Text>Approach: {resp.recommendedApproach}</Text>
-                  <Text color="gray">Skills: {resp.requiredSkills.join(", ")}</Text>
+                  <Text color={colors.textMuted}>Skills: {resp.requiredSkills.join(", ")}</Text>
                   {resp.risks.length > 0 && (
-                    <Text color="yellow">Risks: {resp.risks.join("; ")}</Text>
+                    <Text color={colors.warning}>Risks: {resp.risks.join("; ")}</Text>
                   )}
                 </Box>
               )}
@@ -302,10 +321,10 @@ function AnalysisDetail({
             const barWidth = Math.max(1, Math.round((1 / rank.averageRank) * 20));
             return (
               <Box key={idx} marginLeft={2}>
-                <Text color="gray">{(idx + 1).toString().padStart(2)}. </Text>
-                <Text>{rank.model.padEnd(40)}</Text>
-                <Text color="cyan">{"\u2588".repeat(barWidth)}</Text>
-                <Text color="gray"> avg:{rank.averageRank.toFixed(2)} ({rank.rankCount} votes)</Text>
+                <Text color={colors.textMuted}>{(idx + 1).toString().padStart(2)}. </Text>
+                <Text>{rank.account.padEnd(40)}</Text>
+                <Text color={colors.primary}>{"\u2588".repeat(barWidth)}</Text>
+                <Text color={colors.textMuted}> avg:{rank.averageRank.toFixed(2)} ({rank.rankCount} votes)</Text>
               </Box>
             );
           })}

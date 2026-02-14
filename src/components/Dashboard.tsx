@@ -4,10 +4,12 @@ import { AccountCard } from "./AccountCard.js";
 import { loadDashboardData, type DashboardAccountData } from "../application/use-cases/load-dashboard-data.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
 import { NavContext } from "../app.js";
+import { useTheme } from "../themes/index.js";
 
 const REFRESH_INTERVAL_MS = 30_000;
 
 export function Dashboard() {
+  const { colors } = useTheme();
   const [accounts, setAccounts] = useState<DashboardAccountData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,12 +55,12 @@ export function Dashboard() {
     load();
   }, [refreshTick]);
 
-  if (loading) return <Text color="gray">Loading accounts...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading accounts...</Text>;
 
   if (error) {
     return (
       <Box flexDirection="column">
-        <Text color="red">Error loading config: {error}</Text>
+        <Text color={colors.error}>Error loading config: {error}</Text>
       </Box>
     );
   }
@@ -66,8 +68,8 @@ export function Dashboard() {
   if (accounts.length === 0) {
     return (
       <Box flexDirection="column" paddingY={1}>
-        <Text color="gray">No accounts configured.</Text>
-        <Text color="gray">
+        <Text color={colors.textMuted}>No accounts configured.</Text>
+        <Text color={colors.textMuted}>
           Press [a] to add an account, or run: actl add {"<name>"}
         </Text>
       </Box>
@@ -79,7 +81,7 @@ export function Dashboard() {
   return (
     <Box flexDirection="column" paddingY={1}>
       {aboveCount > 0 && (
-        <Text color="gray">{`\u25B2 ${aboveCount} more`}</Text>
+        <Text color={colors.textMuted}>{`\u25B2 ${aboveCount} more`}</Text>
       )}
       {visibleAccounts.map((a) => (
         <AccountCard
@@ -93,7 +95,7 @@ export function Dashboard() {
         />
       ))}
       {belowCount > 0 && (
-        <Text color="gray">{`\u25BC ${belowCount} more`}</Text>
+        <Text color={colors.textMuted}>{`\u25BC ${belowCount} more`}</Text>
       )}
     </Box>
   );

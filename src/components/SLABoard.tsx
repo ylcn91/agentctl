@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { Box, Text, useInput } from "ink";
 import { NavContext } from "../app.js";
+import { useTheme } from "../themes/index.js";
 import { loadTasks } from "../services/tasks.js";
 import { checkStaleTasks, humanTime, DEFAULT_SLA_CONFIG, type Escalation, type AdaptiveEscalation, type EntireTriggerType } from "../services/sla-engine.js";
 import { useListNavigation } from "../hooks/useListNavigation.js";
@@ -11,15 +12,7 @@ interface Props {
   onNavigate: (view: string) => void;
 }
 
-const ACTION_COLORS: Record<string, string> = {
-  escalate: "red",
-  reassign_suggestion: "yellow",
-  ping: "cyan",
-  suggest_reassign: "yellow",
-  auto_reassign: "redBright",
-  escalate_human: "red",
-  terminate: "red",
-};
+// ACTION_COLORS moved inside component to use theme
 
 const ACTION_LABELS: Record<string, string> = {
   escalate: "🚨 ESCALATE",
@@ -39,7 +32,18 @@ const TRIGGER_LABELS: Record<EntireTriggerType, string> = {
 };
 
 export function SLABoard({ onNavigate }: Props) {
+  const { colors } = useTheme();
   const [escalations, setEscalations] = useState<Escalation[]>([]);
+
+  const ACTION_COLORS: Record<string, string> = {
+    escalate: colors.error,
+    reassign_suggestion: colors.warning,
+    ping: colors.primary,
+    suggest_reassign: colors.warning,
+    auto_reassign: colors.error,
+    escalate_human: colors.error,
+    terminate: colors.error,
+  };
   const [adaptiveEscalations, setAdaptiveEscalations] = useState<AdaptiveEscalation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -56,7 +60,7 @@ export function SLABoard({ onNavigate }: Props) {
   useEffect(() => {
     setGlobalNavEnabled(false);
     return () => setGlobalNavEnabled(true);
-  }, []);
+  }, [setGlobalNavEnabled]);
 
   // Respond to global Ctrl+r refresh
   useEffect(() => {
@@ -94,53 +98,53 @@ export function SLABoard({ onNavigate }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading SLA data...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading SLA data...</Text>;
 
   return (
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>SLA Board</Text>
-        <Text color="gray">  [r]efresh [Esc]back</Text>
+        <Text color={colors.textMuted}>  [r]efresh [Esc]back</Text>
       </Box>
 
       {totalItems === 0 ? (
-        <Text color="green">No stale tasks — all within SLA thresholds.</Text>
+        <Text color={colors.success}>No stale tasks — all within SLA thresholds.</Text>
       ) : (
         <>
           {escalations.map((esc, idx) => (
             <Box key={esc.taskId} marginLeft={1}>
-              <Text color={idx === selectedIndex ? "white" : "gray"}>
+              <Text color={idx === selectedIndex ? colors.text : colors.textMuted}>
                 {idx === selectedIndex ? "> " : "  "}
               </Text>
-              <Text color={ACTION_COLORS[esc.action] ?? "white"}>
+              <Text color={ACTION_COLORS[esc.action] ?? colors.text}>
                 {ACTION_LABELS[esc.action] ?? esc.action}
               </Text>
               <Text> </Text>
-              <Text color="gray">[time-sla] </Text>
-              <Text color={idx === selectedIndex ? "white" : undefined}>
+              <Text color={colors.textMuted}>[time-sla] </Text>
+              <Text color={idx === selectedIndex ? colors.text : undefined}>
                 {esc.taskTitle}
               </Text>
-              <Text color="gray"> | {humanTime(esc.staleForMs)} stale</Text>
-              {esc.assignee && <Text color="magenta"> @{esc.assignee}</Text>}
+              <Text color={colors.textMuted}> | {humanTime(esc.staleForMs)} stale</Text>
+              {esc.assignee && <Text color={colors.primaryMuted}> @{esc.assignee}</Text>}
             </Box>
           ))}
           {adaptiveEscalations.map((esc, idx) => {
             const globalIdx = escalations.length + idx;
             return (
               <Box key={`${esc.taskId}-${esc.trigger.type}`} marginLeft={1}>
-                <Text color={globalIdx === selectedIndex ? "white" : "gray"}>
+                <Text color={globalIdx === selectedIndex ? colors.text : colors.textMuted}>
                   {globalIdx === selectedIndex ? "> " : "  "}
                 </Text>
-                <Text color={ACTION_COLORS[esc.action] ?? "white"}>
+                <Text color={ACTION_COLORS[esc.action] ?? colors.text}>
                   {ACTION_LABELS[esc.action] ?? esc.action}
                 </Text>
                 <Text> </Text>
-                <Text color="gray">{TRIGGER_LABELS[esc.trigger.type] ?? `[${esc.trigger.type}]`} </Text>
-                <Text color={globalIdx === selectedIndex ? "white" : undefined}>
+                <Text color={colors.textMuted}>{TRIGGER_LABELS[esc.trigger.type] ?? `[${esc.trigger.type}]`} </Text>
+                <Text color={globalIdx === selectedIndex ? colors.text : undefined}>
                   {esc.taskTitle}
                 </Text>
-                <Text color="gray"> | {esc.trigger.detail}</Text>
-                {esc.assignee && <Text color="magenta"> @{esc.assignee}</Text>}
+                <Text color={colors.textMuted}> | {esc.trigger.detail}</Text>
+                {esc.assignee && <Text color={colors.primaryMuted}> @{esc.assignee}</Text>}
               </Box>
             );
           })}

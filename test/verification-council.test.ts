@@ -43,8 +43,8 @@ describe("verification-council", () => {
   });
 
   describe("verifyTaskCompletion", () => {
-    test("returns ACCEPT when all models agree", async () => {
-      const mockCaller: LLMCaller = async (_model, systemPrompt, _userPrompt) => {
+    test("returns ACCEPT when all accounts agree", async () => {
+      const mockCaller: LLMCaller = async (_account, systemPrompt, _userPrompt) => {
         if (systemPrompt.includes("peer reviewer")) {
           return JSON.stringify({ ranking: [0, 1, 2], reasoning: "All reviews are solid" });
         }
@@ -70,7 +70,7 @@ describe("verification-council", () => {
         "task-123",
         reviewBundle,
         handoffPayload,
-        { models: ["model-a", "model-b", "model-c"], chairman: "model-a", llmCaller: mockCaller },
+        { members: ["claude", "codex", "opencode"], chairman: "claude", llmCaller: mockCaller },
       );
 
       expect(result.verdict).toBe("ACCEPT");
@@ -84,7 +84,7 @@ describe("verification-council", () => {
     });
 
     test("returns REJECT when chairman rejects", async () => {
-      const mockCaller: LLMCaller = async (_model, systemPrompt, _userPrompt) => {
+      const mockCaller: LLMCaller = async (_account, systemPrompt, _userPrompt) => {
         if (systemPrompt.includes("peer reviewer")) {
           return JSON.stringify({ ranking: [1, 0], reasoning: "Review B is more thorough" });
         }
@@ -109,7 +109,7 @@ describe("verification-council", () => {
         "task-456",
         reviewBundle,
         handoffPayload,
-        { models: ["model-a", "model-b"], chairman: "model-a", llmCaller: mockCaller },
+        { members: ["claude", "codex"], chairman: "claude", llmCaller: mockCaller },
       );
 
       expect(result.verdict).toBe("REJECT");
@@ -119,7 +119,7 @@ describe("verification-council", () => {
 
     test("returns ACCEPT_WITH_NOTES for mixed reviews", async () => {
       let callCount = 0;
-      const mockCaller: LLMCaller = async (_model, systemPrompt, _userPrompt) => {
+      const mockCaller: LLMCaller = async (_account, systemPrompt, _userPrompt) => {
         if (systemPrompt.includes("peer reviewer")) {
           return JSON.stringify({ ranking: [0, 1], reasoning: "Both are valid" });
         }
@@ -154,7 +154,7 @@ describe("verification-council", () => {
         "task-789",
         reviewBundle,
         handoffPayload,
-        { models: ["model-a", "model-b"], chairman: "model-c", llmCaller: mockCaller },
+        { members: ["claude", "codex"], chairman: "opencode", llmCaller: mockCaller },
       );
 
       expect(result.verdict).toBe("ACCEPT_WITH_NOTES");
@@ -162,22 +162,22 @@ describe("verification-council", () => {
       expect(result.notes).toHaveLength(2);
     });
 
-    test("returns REJECT with zero confidence when all models fail", async () => {
+    test("returns REJECT with zero confidence when all accounts fail", async () => {
       const mockCaller: LLMCaller = async () => {
-        throw new Error("Model unavailable");
+        throw new Error("Account unavailable");
       };
 
       const result = await verifyTaskCompletion(
         "task-fail",
         reviewBundle,
         handoffPayload,
-        { models: ["model-a"], chairman: "model-a", llmCaller: mockCaller },
+        { members: ["claude"], chairman: "claude", llmCaller: mockCaller },
       );
 
       expect(result.verdict).toBe("REJECT");
       expect(result.confidence).toBe(0);
       expect(result.individualReviews).toHaveLength(0);
-      expect(result.notes).toContain("All verification models failed to respond");
+      expect(result.notes).toContain("All verification accounts failed to respond");
     });
 
     test("throws when no LLM caller provided", async () => {
@@ -189,7 +189,7 @@ describe("verification-council", () => {
 
   describe("receipt generation", () => {
     test("receipt contains correct task ID and verifier", async () => {
-      const mockCaller: LLMCaller = async (_model, systemPrompt) => {
+      const mockCaller: LLMCaller = async (_account, systemPrompt) => {
         if (systemPrompt.includes("peer reviewer")) {
           return JSON.stringify({ ranking: [0], reasoning: "ok" });
         }
@@ -214,7 +214,7 @@ describe("verification-council", () => {
         "task-receipt-test",
         reviewBundle,
         handoffPayload,
-        { models: ["model-a"], chairman: "model-a", llmCaller: mockCaller },
+        { members: ["claude"], chairman: "claude", llmCaller: mockCaller },
       );
 
       expect(result.receipt.taskId).toBe("task-receipt-test");
@@ -228,7 +228,7 @@ describe("verification-council", () => {
     });
 
     test("specHash is deterministic for same goal+criteria", async () => {
-      const mockCaller: LLMCaller = async (_model, systemPrompt) => {
+      const mockCaller: LLMCaller = async (_account, systemPrompt) => {
         if (systemPrompt.includes("peer reviewer")) {
           return JSON.stringify({ ranking: [0], reasoning: "ok" });
         }
@@ -242,13 +242,13 @@ describe("verification-council", () => {
         "task-1",
         reviewBundle,
         handoffPayload,
-        { models: ["m"], chairman: "m", llmCaller: mockCaller },
+        { members: ["m"], chairman: "m", llmCaller: mockCaller },
       );
       const r2 = await verifyTaskCompletion(
         "task-2",
         reviewBundle,
         handoffPayload,
-        { models: ["m"], chairman: "m", llmCaller: mockCaller },
+        { members: ["m"], chairman: "m", llmCaller: mockCaller },
       );
 
       // Same handoff payload should produce the same specHash
@@ -258,7 +258,7 @@ describe("verification-council", () => {
 
   describe("handles malformed LLM responses", () => {
     test("handles JSON inside markdown fences", async () => {
-      const mockCaller: LLMCaller = async (_model, systemPrompt) => {
+      const mockCaller: LLMCaller = async (_account, systemPrompt) => {
         if (systemPrompt.includes("peer reviewer")) {
           return "```json\n{\"ranking\": [0], \"reasoning\": \"ok\"}\n```";
         }
@@ -272,7 +272,7 @@ describe("verification-council", () => {
         "task-fence",
         reviewBundle,
         handoffPayload,
-        { models: ["m"], chairman: "m", llmCaller: mockCaller },
+        { members: ["m"], chairman: "m", llmCaller: mockCaller },
       );
 
       expect(result.verdict).toBe("ACCEPT");
@@ -280,7 +280,7 @@ describe("verification-council", () => {
     });
 
     test("normalizes unknown verdicts to REJECT", async () => {
-      const mockCaller: LLMCaller = async (_model, systemPrompt) => {
+      const mockCaller: LLMCaller = async (_account, systemPrompt) => {
         if (systemPrompt.includes("peer reviewer")) {
           return JSON.stringify({ ranking: [0], reasoning: "ok" });
         }
@@ -305,7 +305,7 @@ describe("verification-council", () => {
         "task-unknown",
         reviewBundle,
         handoffPayload,
-        { models: ["m"], chairman: "m", llmCaller: mockCaller },
+        { members: ["m"], chairman: "m", llmCaller: mockCaller },
       );
 
       // Unknown verdicts normalize to REJECT

@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { Box, Text, useInput } from "ink";
 import { NavContext } from "../app.js";
+import { useTheme } from "../themes/index.js";
 import type { AccountHealth } from "../daemon/health-monitor.js";
 import { createConnection } from "net";
 import { readFileSync, existsSync } from "fs";
@@ -12,12 +13,6 @@ const REFRESH_INTERVAL_MS = 10_000;
 interface Props {
   onNavigate: (view: string) => void;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  healthy: "green",
-  degraded: "yellow",
-  critical: "red",
-};
 
 const STATUS_DOTS: Record<string, string> = {
   healthy: "\u25CF",
@@ -67,12 +62,6 @@ async function queryDaemonHealth(): Promise<AccountHealth[]> {
     socket.on("data", (data) => parser.feed(data));
 
     socket.on("connect", () => {
-      // health_status via ping (unauthenticated) won't work — we send
-      // a simple ping then a health_status. The daemon allows ping without auth,
-      // but health_status requires auth. For TUI we just use ping-based approach
-      // and fall back to listing config accounts as critical if no daemon.
-      // Actually, the simplest approach: send a health_status request.
-      // The TUI user should have an active token. Try first account token.
       const tokensDir = getTokensDir();
       try {
         const files = require("fs").readdirSync(tokensDir);
@@ -83,8 +72,6 @@ async function queryDaemonHealth(): Promise<AccountHealth[]> {
         const authId = generateRequestId();
         socket.write(frameSend({ type: "auth", account, token, requestId: authId }));
 
-        // Wait for auth_ok then send health_status
-        const origHandler = parser;
         const authParser = createLineParser((authMsg: any) => {
           if (authMsg.type === "auth_ok") {
             const reqId = generateRequestId();
@@ -93,7 +80,7 @@ async function queryDaemonHealth(): Promise<AccountHealth[]> {
             origHandler.feed(Buffer.from(JSON.stringify(authMsg) + "\n"));
           }
         });
-        // Replace the data handler
+        const origHandler = parser;
         socket.removeAllListeners("data");
         socket.on("data", (data) => {
           authParser.feed(data);
@@ -109,11 +96,18 @@ async function queryDaemonHealth(): Promise<AccountHealth[]> {
 }
 
 export function HealthDashboard({ onNavigate }: Props) {
+  const { colors } = useTheme();
   const [statuses, setStatuses] = useState<AccountHealth[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
   const { refreshTick: globalRefresh } = useContext(NavContext);
+
+  const statusColors: Record<string, string> = {
+    healthy: colors.success,
+    degraded: colors.warning,
+    critical: colors.error,
+  };
 
   useEffect(() => {
     if (globalRefresh > 0) setRefreshTick((prev) => prev + 1);
@@ -152,7 +146,7 @@ export function HealthDashboard({ onNavigate }: Props) {
     }
   });
 
-  if (loading) return <Text color="gray">Loading health data...</Text>;
+  if (loading) return <Text color={colors.textMuted}>Loading health data...</Text>;
 
   const healthyCt = statuses.filter((s) => s.status === "healthy").length;
   const degradedCt = statuses.filter((s) => s.status === "degraded").length;
@@ -162,31 +156,31 @@ export function HealthDashboard({ onNavigate }: Props) {
     <Box flexDirection="column" paddingY={1}>
       <Box marginBottom={1}>
         <Text bold>Account Health</Text>
-        <Text color="gray">  [r]efresh [Esc]back  </Text>
-        <Text color="green">{healthyCt} ok</Text>
-        <Text color="gray"> | </Text>
-        <Text color="yellow">{degradedCt} warn</Text>
-        <Text color="gray"> | </Text>
-        <Text color="red">{criticalCt} crit</Text>
+        <Text color={colors.textMuted}>  [r]efresh [Esc]back  </Text>
+        <Text color={colors.success}>{healthyCt} ok</Text>
+        <Text color={colors.textMuted}> | </Text>
+        <Text color={colors.warning}>{degradedCt} warn</Text>
+        <Text color={colors.textMuted}> | </Text>
+        <Text color={colors.error}>{criticalCt} crit</Text>
       </Box>
 
       {statuses.length === 0 ? (
-        <Text color="gray">No accounts configured.</Text>
+        <Text color={colors.textMuted}>No accounts configured.</Text>
       ) : (
         statuses.map((s, idx) => (
           <Box key={s.account} marginLeft={1}>
-            <Text color={idx === selectedIndex ? "white" : "gray"}>
+            <Text color={idx === selectedIndex ? colors.text : colors.textMuted}>
               {idx === selectedIndex ? "> " : "  "}
             </Text>
-            <Text color={STATUS_COLORS[s.status]}>
+            <Text color={statusColors[s.status]}>
               {STATUS_DOTS[s.status]}
             </Text>
             <Text> </Text>
             <Text bold={idx === selectedIndex}>{s.account.padEnd(20)}</Text>
-            <Text color={STATUS_COLORS[s.status]}>
+            <Text color={statusColors[s.status]}>
               {s.status.padEnd(10)}
             </Text>
-            <Text color="gray">
+            <Text color={colors.textMuted}>
               {s.connected ? "connected" : "offline"}
               {s.errorCount > 0 ? `  errors: ${s.errorCount}` : ""}
               {s.rateLimited ? "  RATE-LIMITED" : ""}

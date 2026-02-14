@@ -55,10 +55,10 @@ const HubConfigSchema = z.object({
     cognitiveFriction: z.boolean().optional(),
   }).optional(),
   council: z.object({
-    models: z.array(z.string()),
+    members: z.array(z.string()),
     chairman: z.string(),
-    apiKey: z.string().optional(),
   }).optional(),
+  theme: z.string().optional(),
   delegationDepth: z.object({
     maxDepth: z.number().int().min(1).optional(),
   }).optional(),
@@ -96,6 +96,7 @@ export async function loadConfig(path?: string): Promise<HubConfig> {
     notifications: (raw.notifications as HubConfig["notifications"]) ?? undefined,
     github: (raw.github as HubConfig["github"]) ?? undefined,
     council: (raw.council as HubConfig["council"]) ?? undefined,
+    theme: (raw.theme as string) ?? undefined,
     delegationDepth: (raw.delegationDepth as HubConfig["delegationDepth"]) ?? undefined,
     defaults: {
       launchInNewWindow: (rawDefaults?.launchInNewWindow as boolean) ?? DEFAULT_CONFIG.defaults.launchInNewWindow,
