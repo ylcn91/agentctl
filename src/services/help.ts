@@ -69,13 +69,14 @@ const COMMANDS: Record<string, CommandHelp> = {
     ],
   },
   daemon: {
-    usage: "actl daemon <start|stop|status>",
+    usage: "actl daemon <start|stop|status|supervise>",
     description:
-      "Manage the agentctl daemon. The daemon enables inter-account communication via MCP bridge (handoffs, messages, task updates).",
+      "Manage the agentctl daemon. The daemon enables inter-account communication via MCP bridge (handoffs, messages, task updates, council, sessions).",
     examples: [
-      "actl daemon start   # start in background",
-      "actl daemon status  # check if running",
-      "actl daemon stop    # stop the daemon",
+      "actl daemon start     # start in background",
+      "actl daemon status    # check if running",
+      "actl daemon stop      # stop the daemon",
+      "actl daemon supervise # start with auto-restart on crash",
     ],
   },
   bridge: {
@@ -214,6 +215,7 @@ function overview(): string {
       header: "Daemon & Communication",
       cmds: [
         ["actl daemon start|stop|status", "Manage the hub daemon"],
+        ["actl daemon supervise", "Start daemon with auto-restart"],
         ["actl bridge --account <name>", "MCP bridge (internal)"],
       ],
     },
@@ -239,7 +241,9 @@ function overview(): string {
 
   const tui = chalk.gray(
     "\n  Run " + chalk.white("actl") + " with no arguments to open the interactive TUI.\n" +
-    "  TUI views: [d]ashboard [l]auncher [u]sage [a]dd [t]asks [m]ail [e]scalation [r]prompts [n]analytics [h]ealth  [Esc] back  [q] quit"
+    "  TUI views: [d]ashboard [l]auncher [u]sage [a]dd [t]asks [m]ail [e]scalation\n" +
+    "             [r]prompts [n]analytics [w]orkflows [h]ealth [c]ouncil [v]erify\n" +
+    "             [i]ntire [g]chains  [Ctrl+P] command palette  [Esc] back  [q] quit"
   );
 
   return `\n${mascot}\n\n${title}\n${body}\n${tui}\n`;
