@@ -5,7 +5,7 @@ export interface QuotaPolicyConfig {
   source: "community-estimate" | "custom";
 }
 
-export const PROVIDER_IDS = ["claude-code", "codex-cli", "openhands", "gemini-cli"] as const;
+export const PROVIDER_IDS = ["claude-code", "codex-cli", "openhands", "gemini-cli", "opencode", "cursor-agent"] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export interface AccountConfig {
@@ -26,6 +26,8 @@ export interface FeatureFlags {
   reviewBundles?: boolean;
   knowledgeIndex?: boolean;
   reliability?: boolean;
+  workflow?: boolean;
+  retro?: boolean;
 }
 
 export interface GitHubConfig {

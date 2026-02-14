@@ -23,6 +23,7 @@
     "ink-text-input": "^6.0.0",
     "meow": "^13",
     "react": "^18",
-    "react-reconciler": "^0.29"
+    "react-reconciler": "^0.29",
+    "yaml": "^2.8.2"
   }
 }

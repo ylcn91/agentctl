@@ -11,6 +11,8 @@ import { MessageInbox } from "./components/MessageInbox.js";
 import { SLABoard } from "./components/SLABoard.js";
 import { PromptLibrary } from "./components/PromptLibrary.js";
 import Analytics from "./components/Analytics.js";
+import { WorkflowBoard } from "./components/WorkflowBoard.js";
+import { WorkflowDetail } from "./components/WorkflowDetail.js";
 
 const NAV_KEYS: Record<string, string> = {
   d: "dashboard",
@@ -22,10 +24,12 @@ const NAV_KEYS: Record<string, string> = {
   e: "sla",
   r: "prompts",
   n: "analytics",
+  w: "workflows",
 };
 
 export function App() {
   const [view, setView] = useState("dashboard");
+  const [viewDetail, setViewDetail] = useState<any>(null);
   const [accountNames, setAccountNames] = useState<string[]>([]);
 
   useEffect(() => {
@@ -54,6 +58,8 @@ export function App() {
       {view === "sla" && <SLABoard onNavigate={setView} />}
       {view === "prompts" && <PromptLibrary onNavigate={setView} />}
       {view === "analytics" && <Analytics onNavigate={setView} />}
+      {view === "workflows" && <WorkflowBoard onNavigate={(v, detail) => { setViewDetail(detail); setView(v); }} />}
+      {view === "workflow_detail" && viewDetail?.runId && <WorkflowDetail runId={viewDetail.runId} onNavigate={setView} />}
     </Box>
   );
 }

@@ -67,3 +67,15 @@ export function getExternalLinksDbPath(): string {
 export function getReviewBundlesDir(): string {
   return `${getHubDir()}/review-bundles`;
 }
+
+export function getActivityDbPath(): string {
+  return `${getHubDir()}/activity.db`;
+}
+
+export function getWorkflowDbPath(): string {
+  return `${getHubDir()}/workflow.db`;
+}
+
+export function getRetroDbPath(): string {
+  return `${getHubDir()}/retro.db`;
+}

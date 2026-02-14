@@ -3,6 +3,8 @@ import { ClaudeCodeProvider } from "./claude-code";
 import { CodexCliProvider } from "./codex-cli";
 import { OpenHandsProvider } from "./openhands";
 import { GeminiCliProvider } from "./gemini-cli";
+import { OpenCodeProvider } from "./opencode";
+import { CursorAgentProvider } from "./cursor-agent";
 
 export class ProviderRegistry {
   private providers = new Map<string, AgentProvider>();
@@ -37,5 +39,7 @@ export function createDefaultRegistry(): ProviderRegistry {
   registry.register(new CodexCliProvider());
   registry.register(new OpenHandsProvider());
   registry.register(new GeminiCliProvider());
+  registry.register(new OpenCodeProvider());
+  registry.register(new CursorAgentProvider());
   return registry;
 }

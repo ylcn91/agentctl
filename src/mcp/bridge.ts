@@ -116,43 +116,48 @@ export async function startBridge(account: string): Promise<void> {
   // Reconnection logic for daemon socket
   let reconnectAttempts = 0;
 
-  daemonSocket.on("close", () => {
-    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      console.error("[bridge] Max reconnection attempts reached");
-      return;
-    }
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), RECONNECT_MAX_DELAY_MS);
-    reconnectAttempts++;
-    console.error(`[bridge] Connection lost, reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-    setTimeout(async () => {
-      try {
-        await ensureDaemonRunning();
-        const newSocket = createConnection(DAEMON_SOCK_PATH);
-        newSocket.once("connect", async () => {
-          try {
-            const newSender = createDaemonSender(newSocket);
-            const token = getToken(account);
-            const resp = await newSender({ type: "auth", account, token });
-            if (resp.type === "auth_ok") {
-              currentSender = newSender;
-              reconnectAttempts = 0;
-              console.error("[bridge] Reconnected successfully");
-            }
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            console.error("[bridge] Re-auth failed:", message);
-          }
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error("[bridge] Reconnection failed:", message);
+  function attachReconnectHandlers(sock: Socket): void {
+    sock.on("close", () => {
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.error("[bridge] Max reconnection attempts reached");
+        return;
       }
-    }, delay);
-  });
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), RECONNECT_MAX_DELAY_MS);
+      reconnectAttempts++;
+      console.error(`[bridge] Connection lost, reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+      setTimeout(async () => {
+        try {
+          await ensureDaemonRunning();
+          const newSocket = createConnection(DAEMON_SOCK_PATH);
+          newSocket.once("connect", async () => {
+            try {
+              const newSender = createDaemonSender(newSocket);
+              const token = getToken(account);
+              const resp = await newSender({ type: "auth", account, token });
+              if (resp.type === "auth_ok") {
+                currentSender = newSender;
+                reconnectAttempts = 0;
+                attachReconnectHandlers(newSocket);
+                console.error("[bridge] Reconnected successfully");
+              }
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              console.error("[bridge] Re-auth failed:", message);
+            }
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error("[bridge] Reconnection failed:", message);
+        }
+      }, delay);
+    });
 
-  daemonSocket.on("error", (err) => {
-    console.error("[bridge] Socket error:", err.message);
-  });
+    sock.on("error", (err) => {
+      console.error("[bridge] Socket error:", err.message);
+    });
+  }
+
+  attachReconnectHandlers(daemonSocket);
 
   // Start MCP server on stdio
   const mcpServer = new McpServer(

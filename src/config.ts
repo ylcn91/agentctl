@@ -46,6 +46,8 @@ const HubConfigSchema = z.object({
     reviewBundles: z.boolean().optional(),
     knowledgeIndex: z.boolean().optional(),
     reliability: z.boolean().optional(),
+    workflow: z.boolean().optional(),
+    retro: z.boolean().optional(),
   }).optional(),
   github: z.object({
     enabled: z.boolean(),

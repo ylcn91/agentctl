@@ -4,7 +4,12 @@ import { WorkspaceManager } from "./workspace-manager";
 import { CapabilityStore } from "./capability-store";
 import { KnowledgeStore } from "./knowledge-store";
 import { ExternalLinkStore } from "../services/external-links";
-import { getKnowledgeDbPath } from "../paths";
+import { ActivityStore } from "../services/activity-store";
+import { WorkflowStore } from "../services/workflow-store";
+import { WorkflowEngine } from "../services/workflow-engine";
+import { getKnowledgeDbPath, getActivityDbPath, getWorkflowDbPath, getRetroDbPath } from "../paths";
+import { RetroStore } from "../services/retro-store";
+import { RetroEngine } from "../services/retro-engine";
 
 export interface Message {
   id?: string;
@@ -25,6 +30,11 @@ export class DaemonState {
   capabilityStore?: CapabilityStore;
   knowledgeStore?: KnowledgeStore;
   externalLinkStore?: ExternalLinkStore;
+  activityStore?: ActivityStore;
+  workflowStore?: WorkflowStore;
+  workflowEngine?: WorkflowEngine;
+  retroStore?: RetroStore;
+  retroEngine?: RetroEngine;
   startedAt: string = new Date().toISOString();
   slaTimerId?: ReturnType<typeof setInterval>;
   onMessagePersist?: (msg: Message) => Promise<void>;
@@ -55,6 +65,27 @@ export class DaemonState {
 
   initExternalLinks(dbPath?: string): void {
     this.externalLinkStore = new ExternalLinkStore(dbPath);
+  }
+
+  initActivity(dbPath?: string): void {
+    const path = dbPath ?? getActivityDbPath();
+    this.activityStore = new ActivityStore(path);
+  }
+
+  initWorkflow(dbPath?: string): void {
+    const path = dbPath ?? getWorkflowDbPath();
+    this.workflowStore = new WorkflowStore(path);
+    this.workflowEngine = new WorkflowEngine(this.workflowStore, this.activityStore, this);
+  }
+
+  initRetro(dbPath?: string): void {
+    const path = dbPath ?? getRetroDbPath();
+    this.retroStore = new RetroStore(path);
+    this.retroEngine = new RetroEngine(this.retroStore, this.activityStore, this.knowledgeStore);
+    // Wire retro engine into workflow engine for auto-trigger on completion
+    if (this.workflowEngine) {
+      this.workflowEngine.retroEngine = this.retroEngine;
+    }
   }
 
   connectAccount(name: string, token: string): void {
@@ -124,6 +155,9 @@ export class DaemonState {
     this.capabilityStore?.close();
     this.knowledgeStore?.close();
     this.externalLinkStore?.close();
+    this.activityStore?.close();
+    this.workflowStore?.close();
+    this.retroStore?.close();
     this.store.close();
   }
 }

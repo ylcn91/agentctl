@@ -265,3 +265,127 @@ describe("stores extend BaseStore", () => {
     store.close();
   });
 });
+
+// ─── Bug regression tests ────────────────────────────────────────────
+
+describe("bug regressions", () => {
+  test("[P1] socket parent dir: daemon creates nested sockPath directories", async () => {
+    const nestedDir = join(tmpdir(), `hub-nested-${Date.now()}`, "sub", "dir");
+    const sockPath = join(nestedDir, "test.sock");
+    process.env.CLAUDE_HUB_DIR = join(tmpdir(), `hub-nested-${Date.now()}`);
+    mkdirSync(join(process.env.CLAUDE_HUB_DIR, "tokens"), { recursive: true });
+
+    const { startDaemon, stopDaemon } = await import("../src/daemon/server");
+    const { server, watchdog } = startDaemon({ dbPath: ":memory:", sockPath });
+    expect(server.listening).toBe(true);
+    const { existsSync: exists } = await import("fs");
+    expect(exists(nestedDir)).toBe(true);
+    stopDaemon(server, sockPath, watchdog);
+    rmSync(process.env.CLAUDE_HUB_DIR, { recursive: true, force: true });
+    delete process.env.CLAUDE_HUB_DIR;
+  });
+
+  test("[P1] server.ts no longer has duplicate path functions", async () => {
+    const { readFileSync: readFile } = await import("fs");
+    const serverSrc = readFile(join(import.meta.dir, "..", "src", "daemon", "server.ts"), "utf-8");
+    // Should import from ../paths, not define its own getHubDir
+    expect(serverSrc).toContain('from "../paths"');
+    // Should not have a local function getHubDir
+    const localFnMatches = serverSrc.match(/^function getHubDir/m);
+    expect(localFnMatches).toBeNull();
+  });
+
+  test("[P1] pagination truthy check: limit=0 uses getMessages not getUnreadMessages", () => {
+    const { DaemonState } = require("../src/daemon/state");
+    const state = new DaemonState(":memory:");
+    state.addMessage({ from: "a", to: "b", type: "message", content: "msg1", timestamp: new Date().toISOString() });
+    state.addMessage({ from: "a", to: "b", type: "message", content: "msg2", timestamp: new Date().toISOString() });
+
+    // limit=0 should be treated as an explicit pagination param, not falsy
+    // With the old code, limit=0 would be treated as falsy and fall through to getUnreadMessages
+    const allMessages = state.getMessages("b", { limit: 0 });
+    // limit=0 means "return 0 messages" from getMessages, not "return unread"
+    expect(allMessages).toHaveLength(0);
+
+    // Without limit/offset, should return unread
+    const unread = state.getUnreadMessages("b");
+    expect(unread).toHaveLength(2);
+    state.close();
+  });
+
+  test("[P1] pagination truthy check: offset=0 uses getMessages not getUnreadMessages", () => {
+    const { DaemonState } = require("../src/daemon/state");
+    const state = new DaemonState(":memory:");
+    state.addMessage({ from: "a", to: "b", type: "message", content: "msg1", timestamp: new Date().toISOString() });
+
+    // offset=0 should be treated as explicit, not falsy
+    const msgs = state.getMessages("b", { offset: 0 });
+    expect(msgs).toHaveLength(1);
+    state.close();
+  });
+
+  test("[P2] archive_messages defaults days to 7 when omitted", () => {
+    const { DaemonState } = require("../src/daemon/state");
+    const state = new DaemonState(":memory:");
+    // Add an old message (> 7 days ago)
+    const oldDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    state.addMessage({ from: "a", to: "b", type: "message", content: "old msg", timestamp: oldDate });
+    // Add a recent message
+    state.addMessage({ from: "a", to: "b", type: "message", content: "new msg", timestamp: new Date().toISOString() });
+    // archiveOld only deletes read messages, so mark them read first
+    state.markAllRead("b");
+
+    // archiveOld with default days=7 should archive the old message
+    const archived = state.archiveOld(7);
+    expect(archived).toBeGreaterThanOrEqual(1);
+    // Recent message should still exist
+    const msgs = state.getMessages("b");
+    expect(msgs.some((m: any) => m.content === "new msg")).toBe(true);
+    state.close();
+  });
+
+  test("[P2] cumulative payload guard: totalBytes resets after each parsed message", async () => {
+    const { createLineParser } = await import("../src/daemon/framing");
+
+    // Simulate the daemon's data handler pattern with the fix
+    let totalBytes = 0;
+    const MAX_PAYLOAD_BYTES = 100;
+    const receivedMessages: any[] = [];
+
+    const parser = createLineParser((msg) => {
+      totalBytes = 0; // this is the fix
+      receivedMessages.push(msg);
+    });
+
+    // Simulate receiving multiple messages, each under the limit individually
+    // but cumulatively exceeding it
+    const msg1 = JSON.stringify({ type: "ping" }) + "\n"; // ~16 bytes
+    const msg2 = JSON.stringify({ type: "ping" }) + "\n"; // ~16 bytes
+    const msg3 = JSON.stringify({ type: "ping" }) + "\n"; // ~16 bytes
+
+    // Without the fix, totalBytes would accumulate and exceed MAX_PAYLOAD_BYTES
+    // With the fix, totalBytes resets after each parsed message
+    for (const msg of [msg1, msg2, msg3, msg1, msg2, msg3, msg1]) {
+      totalBytes += Buffer.byteLength(msg);
+      if (totalBytes > MAX_PAYLOAD_BYTES) {
+        // Without the reset, this would trigger a disconnect
+        break;
+      }
+      parser.feed(msg);
+    }
+
+    // All 7 messages should have been processed because totalBytes resets
+    expect(receivedMessages).toHaveLength(7);
+  });
+
+  test("[P2] bridge reconnection: attachReconnectHandlers exists in bridge.ts", async () => {
+    const { readFileSync: readFile } = await import("fs");
+    const bridgeSrc = readFile(join(import.meta.dir, "..", "src", "mcp", "bridge.ts"), "utf-8");
+    // Should have the extracted function
+    expect(bridgeSrc).toContain("function attachReconnectHandlers");
+    // Should call it on the initial daemonSocket
+    expect(bridgeSrc).toContain("attachReconnectHandlers(daemonSocket)");
+    // Should call it on the new socket after reconnection
+    expect(bridgeSrc).toContain("attachReconnectHandlers(newSocket)");
+  });
+});

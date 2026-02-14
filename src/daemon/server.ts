@@ -1,5 +1,6 @@
 import { createServer, type Server, type Socket } from "net";
 import { existsSync, unlinkSync, writeFileSync, readFileSync, mkdirSync } from "fs";
+import { dirname } from "path";
 import { timingSafeEqual } from "crypto";
 import { DaemonState } from "./state";
 import { createLineParser, frameSend } from "./framing";
@@ -13,22 +14,9 @@ import { checkStaleTasks, formatEscalationMessage, DEFAULT_SLA_CONFIG } from "..
 import { computeWorkloadSnapshots, computeWorkloadModifier } from "../services/workload-metrics";
 import { getHealthStatus } from "./health";
 import { startWatchdog } from "./watchdog";
-
-function getHubDir(): string {
-  return process.env.CLAUDE_HUB_DIR ?? `${process.env.HOME}/.claude-hub`;
-}
-
-function getSockPath(): string {
-  return `${getHubDir()}/hub.sock`;
-}
-
-function getPidPath(): string {
-  return `${getHubDir()}/daemon.pid`;
-}
-
-function getTokensDir(): string {
-  return `${getHubDir()}/tokens`;
-}
+import { getHubDir, getSockPath, getPidPath, getTokensDir, getActivityDbPath } from "../paths";
+import { scanWorkflowDir } from "../services/workflow-parser";
+import { join } from "path";
 
 const SAFE_ACCOUNT_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$/;
 
@@ -64,6 +52,9 @@ export interface DaemonOpts {
   workspaceDbPath?: string;
   capabilityDbPath?: string;
   knowledgeDbPath?: string;
+  activityDbPath?: string;
+  workflowDbPath?: string;
+  retroDbPath?: string;
   sockPath?: string;
   features?: {
     workspaceWorktree?: boolean;
@@ -74,6 +65,8 @@ export interface DaemonOpts {
     reviewBundles?: boolean;
     knowledgeIndex?: boolean;
     reliability?: boolean;
+    workflow?: boolean;
+    retro?: boolean;
   };
 }
 
@@ -104,6 +97,16 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
   if (features?.githubIntegration) {
     state.initExternalLinks();
   }
+  if (features?.workflow || features?.retro) {
+    state.initActivity(opts?.activityDbPath);
+  }
+  if (features?.workflow) {
+    state.initWorkflow(opts?.workflowDbPath);
+    mkdirSync(join(getHubDir(), "workflows"), { recursive: true });
+  }
+  if (features?.retro) {
+    state.initRetro(opts?.retroDbPath);
+  }
 
   let watchdog: { stop: () => void } | undefined;
   if (features?.reliability) {
@@ -113,6 +116,10 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
   mkdirSync(getHubDir(), { recursive: true });
 
   const sockPath = opts?.sockPath ?? getSockPath();
+  const sockDir = dirname(sockPath);
+  if (sockDir !== getHubDir()) {
+    mkdirSync(sockDir, { recursive: true });
+  }
 
   // Cleanup orphaned socket
   if (existsSync(sockPath)) unlinkSync(sockPath);
@@ -131,6 +138,7 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
     };
 
     const parser = createLineParser((msg) => {
+      totalBytes = 0;
       resetIdleTimer();
 
       // Allow unauthenticated ping for health checks (reveals no data)
@@ -200,10 +208,10 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
           }
           const limit = msg.limit as number | undefined;
           const offset = msg.offset as number | undefined;
-          const messages = (limit || offset)
+          const messages = (limit !== undefined || offset !== undefined)
             ? state.getMessages(accountName, { limit, offset })
             : state.getUnreadMessages(accountName);
-          if (!limit && !offset) {
+          if (limit === undefined && offset === undefined) {
             state.markAllRead(accountName);
           }
           safeWrite(socket, reply(msg, { type: "result", messages }));
@@ -362,11 +370,12 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
         },
 
         archive_messages: (msg) => {
-          if (!Number.isInteger(msg.days) || msg.days < 1) {
+          const days = msg.days ?? 7;
+          if (!Number.isInteger(days) || days < 1) {
             safeWrite(socket, reply(msg, { type: "error", error: "Invalid field: days" }));
             return;
           }
-          const archived = state.archiveOld(msg.days);
+          const archived = state.archiveOld(days);
           safeWrite(socket, reply(msg, { type: "result", archived }));
         },
 
@@ -607,6 +616,140 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
           } catch (err: any) {
             safeWrite(socket, reply(msg, { type: "error", error: err.message }));
           }
+        },
+
+        workflow_trigger: async (msg) => {
+          if (!state.workflowEngine) {
+            safeWrite(socket, reply(msg, { type: "error", error: "Workflow feature not enabled" }));
+            return;
+          }
+          try {
+            const definitions = await scanWorkflowDir(join(getHubDir(), "workflows"));
+            const def = definitions.find(d => d.name === msg.workflowName);
+            if (!def) {
+              safeWrite(socket, reply(msg, { type: "error", error: `Workflow '${msg.workflowName}' not found` }));
+              return;
+            }
+            const runId = await state.workflowEngine.triggerWorkflow(def, msg.context ?? "");
+            safeWrite(socket, reply(msg, { type: "result", runId, status: "running" }));
+          } catch (err: any) {
+            safeWrite(socket, reply(msg, { type: "error", error: err.message }));
+          }
+        },
+
+        workflow_status: (msg) => {
+          if (!state.workflowStore) {
+            safeWrite(socket, reply(msg, { type: "error", error: "Workflow feature not enabled" }));
+            return;
+          }
+          const run = state.workflowStore.getRun(msg.runId);
+          if (!run) {
+            safeWrite(socket, reply(msg, { type: "error", error: "Run not found" }));
+            return;
+          }
+          const steps = state.workflowStore.getStepRunsForRun(msg.runId);
+          safeWrite(socket, reply(msg, { type: "result", run, steps }));
+        },
+
+        workflow_list: async (msg) => {
+          if (!state.workflowEngine) {
+            safeWrite(socket, reply(msg, { type: "error", error: "Workflow feature not enabled" }));
+            return;
+          }
+          try {
+            const definitions = await scanWorkflowDir(join(getHubDir(), "workflows"));
+            safeWrite(socket, reply(msg, { type: "result", definitions }));
+          } catch (err: any) {
+            safeWrite(socket, reply(msg, { type: "error", error: err.message }));
+          }
+        },
+
+        workflow_cancel: async (msg) => {
+          if (!state.workflowEngine) {
+            safeWrite(socket, reply(msg, { type: "error", error: "Workflow feature not enabled" }));
+            return;
+          }
+          try {
+            await state.workflowEngine.cancelWorkflow(msg.runId);
+            safeWrite(socket, reply(msg, { type: "result", cancelled: true }));
+          } catch (err: any) {
+            safeWrite(socket, reply(msg, { type: "error", error: err.message }));
+          }
+        },
+
+        retro_start_session: (msg) => {
+          if (!state.retroEngine) {
+            safeWrite(socket, reply(msg, { type: "error", error: "Retro feature not enabled" }));
+            return;
+          }
+          try {
+            const session = state.retroEngine.startRetro(msg.workflowRunId, msg.participants, msg.chairman);
+            safeWrite(socket, reply(msg, { type: "result", session }));
+          } catch (err: any) {
+            safeWrite(socket, reply(msg, { type: "error", error: err.message }));
+          }
+        },
+
+        retro_submit_review: (msg) => {
+          if (!state.retroEngine) {
+            safeWrite(socket, reply(msg, { type: "error", error: "Retro feature not enabled" }));
+            return;
+          }
+          try {
+            const review = {
+              author: accountName,
+              whatWentWell: msg.whatWentWell ?? [],
+              whatDidntWork: msg.whatDidntWork ?? [],
+              suggestions: msg.suggestions ?? [],
+              agentPerformanceNotes: msg.agentPerformanceNotes ?? {},
+              submittedAt: new Date().toISOString(),
+            };
+            const status = state.retroEngine.submitReview(msg.retroId, review);
+            if (status.allCollected) {
+              const aggregation = state.retroEngine.aggregate(msg.retroId);
+              safeWrite(socket, reply(msg, { type: "result", ...status, aggregation }));
+            } else {
+              safeWrite(socket, reply(msg, { type: "result", ...status }));
+            }
+          } catch (err: any) {
+            safeWrite(socket, reply(msg, { type: "error", error: err.message }));
+          }
+        },
+
+        retro_submit_synthesis: async (msg) => {
+          if (!state.retroEngine) {
+            safeWrite(socket, reply(msg, { type: "error", error: "Retro feature not enabled" }));
+            return;
+          }
+          try {
+            await state.retroEngine.completeSynthesis(msg.retroId, msg.document);
+            safeWrite(socket, reply(msg, { type: "result", completed: true }));
+          } catch (err: any) {
+            safeWrite(socket, reply(msg, { type: "error", error: err.message }));
+          }
+        },
+
+        retro_status: (msg) => {
+          if (!state.retroEngine) {
+            safeWrite(socket, reply(msg, { type: "error", error: "Retro feature not enabled" }));
+            return;
+          }
+          const session = state.retroEngine.getSession(msg.retroId);
+          if (!session) {
+            safeWrite(socket, reply(msg, { type: "error", error: "Retro session not found" }));
+            return;
+          }
+          const document = state.retroEngine.getDocument(msg.retroId);
+          safeWrite(socket, reply(msg, { type: "result", session, document }));
+        },
+
+        retro_get_past_learnings: async (msg) => {
+          if (!state.retroEngine) {
+            safeWrite(socket, reply(msg, { type: "error", error: "Retro feature not enabled" }));
+            return;
+          }
+          const learnings = await state.retroEngine.getPastLearnings();
+          safeWrite(socket, reply(msg, { type: "result", learnings }));
         },
       };
 
