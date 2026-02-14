@@ -23,18 +23,18 @@ function makeCapability(overrides: Partial<AccountCapability> = {}): AccountCapa
 }
 
 describe("scoreAccount", () => {
-  test("perfect skill match gives full 40 skill points", () => {
+  test("perfect skill match gives full 30 skill points", () => {
     const cap = makeCapability({ skills: ["typescript", "testing"] });
     const result = scoreAccount(cap, ["typescript", "testing"]);
     expect(result.reasons[0]).toContain("2/2");
-    expect(result.reasons[0]).toContain("40pts");
+    expect(result.reasons[0]).toContain("30pts");
   });
 
   test("partial skill match gives proportional points", () => {
     const cap = makeCapability({ skills: ["typescript"] });
     const result = scoreAccount(cap, ["typescript", "testing", "devops", "react"]);
     expect(result.reasons[0]).toContain("1/4");
-    expect(result.reasons[0]).toContain("10pts");
+    expect(result.reasons[0]).toContain("8pts");
   });
 
   test("no skill match gives 0 skill points", () => {
@@ -44,51 +44,53 @@ describe("scoreAccount", () => {
     expect(result.reasons[0]).toContain("0pts");
   });
 
-  test("empty required skills gives full 40 points", () => {
+  test("empty required skills gives full 30 points", () => {
     const cap = makeCapability();
     const result = scoreAccount(cap, []);
     expect(result.reasons[0]).toContain("no skills required");
-    expect(result.reasons[0]).toContain("40pts");
+    expect(result.reasons[0]).toContain("30pts");
   });
 
-  test("high success rate gives near 30 points", () => {
+  test("high success rate gives near 25 points", () => {
     const cap = makeCapability({ totalTasks: 100, acceptedTasks: 95, rejectedTasks: 5 });
     const result = scoreAccount(cap, []);
     expect(result.reasons[1]).toContain("95%");
-    // 95% of 30 = 28.5 -> rounds to 29
-    expect(result.reasons[1]).toContain("29pts");
+    // 95% of 25 = 23.75 -> rounds to 24
+    expect(result.reasons[1]).toContain("24pts");
   });
 
-  test("zero tasks (cold start) gives neutral 15 points", () => {
+  test("zero tasks (cold start) gives neutral 13 points", () => {
     const cap = makeCapability({ totalTasks: 0, acceptedTasks: 0, rejectedTasks: 0 });
     const result = scoreAccount(cap, []);
     expect(result.reasons[1]).toContain("no history");
-    expect(result.reasons[1]).toContain("15pts");
+    expect(result.reasons[1]).toContain("13pts");
   });
 
-  test("fast delivery gives 20 speed points", () => {
+  test("fast delivery gives 10 speed points", () => {
     const cap = makeCapability({ avgDeliveryMs: 120_000 }); // 2 min
     const result = scoreAccount(cap, []);
-    expect(result.reasons[2]).toContain("20pts");
+    // reasons[2] is provider fit, reasons[3] is speed
+    expect(result.reasons[3]).toContain("10pts");
   });
 
   test("slow delivery gives low speed points", () => {
     const cap = makeCapability({ avgDeliveryMs: 3_600_000 }); // 60 min
     const result = scoreAccount(cap, []);
-    expect(result.reasons[2]).toContain("5pts");
+    expect(result.reasons[3]).toContain("2pts");
   });
 
-  test("recently active gives 10 recency points", () => {
+  test("recently active gives 5 recency points", () => {
     const cap = makeCapability({ lastActiveAt: new Date().toISOString() });
     const result = scoreAccount(cap, []);
-    expect(result.reasons[3]).toContain("10pts");
+    // reasons[5] is recency (after skill, success, provider fit, speed, trust)
+    expect(result.reasons[5]).toContain("5pts");
   });
 
   test("inactive over 1hr gives low recency points", () => {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const cap = makeCapability({ lastActiveAt: twoHoursAgo });
     const result = scoreAccount(cap, []);
-    expect(result.reasons[3]).toContain("1pts");
+    expect(result.reasons[5]).toContain("1pts");
   });
 });
 

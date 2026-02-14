@@ -15,6 +15,7 @@ import { SharedSessionManager } from "./shared-session";
 import { HealthMonitor } from "./health-monitor";
 import { TrustStore } from "./trust-store";
 import { EventBus } from "../services/event-bus";
+import { ProgressTracker } from "../services/progress-tracker";
 
 export interface Message {
   id?: string;
@@ -43,6 +44,7 @@ export class DaemonState {
   sessionStore?: SessionStore;
   trustStore?: TrustStore;
   eventBus = new EventBus();
+  progressTracker = new ProgressTracker();
   sharedSessionManager = new SharedSessionManager();
   healthMonitor = new HealthMonitor();
   startedAt: string = new Date().toISOString();

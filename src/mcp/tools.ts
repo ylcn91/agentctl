@@ -820,4 +820,62 @@ export function registerTools(server: McpServer, sendToDaemon: DaemonSender, acc
     });
     return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
   });
+
+  // ── Phase 2: Intelligent Delegation Tools ──
+
+  server.registerTool("report_progress", {
+    description: "Report intermediate progress on a task. Enables proactive SLA monitoring and behind-schedule detection.",
+    inputSchema: {
+      taskId: z.string().describe("Task ID"),
+      percent: z.number().min(0).max(100).describe("Completion percentage (0-100)"),
+      currentStep: z.string().describe('What you are doing now (e.g. "running tests")'),
+      blockers: z.array(z.string()).optional().describe("Current blockers, if any"),
+      estimatedRemainingMinutes: z.number().optional().describe("Estimated minutes remaining"),
+      artifactsProduced: z.array(z.string()).optional().describe("Files created/modified so far"),
+    },
+  }, async (args) => {
+    const result = await sendToDaemon({
+      type: "report_progress",
+      taskId: args.taskId,
+      agent: account,
+      percent: args.percent,
+      currentStep: args.currentStep,
+      blockers: args.blockers,
+      estimatedRemainingMinutes: args.estimatedRemainingMinutes,
+      artifactsProduced: args.artifactsProduced,
+    });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
+
+  server.registerTool("analyze_task", {
+    description: "Run multi-model council analysis on a task before delegation. Returns complexity assessment, recommended approach, required skills, and best-fit provider.",
+    inputSchema: {
+      goal: z.string().describe("Task goal to analyze"),
+      context: z.string().optional().describe("Additional context about the task"),
+    },
+  }, async (args) => {
+    const result = await sendToDaemon({
+      type: "council_analyze",
+      goal: args.goal,
+      context: args.context,
+    });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
+
+  server.registerTool("get_trust_scores", {
+    description: "Get trust and reputation scores for all agents or a specific agent. Shows completion rate, SLA compliance, quality metrics, and trust level.",
+    inputSchema: {
+      account: z.string().optional().describe("Specific account (omit for all)"),
+    },
+  }, async (args) => {
+    const result = await sendToDaemon({ type: "get_trust", account: args.account });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
+
+  server.registerTool("check_adaptive_sla", {
+    description: "Run adaptive SLA check with graduated responses. Returns actionable recommendations (ping, reassign, quarantine, escalate) based on task criticality and progress.",
+  }, async () => {
+    const result = await sendToDaemon({ type: "adaptive_sla_check" });
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+  });
 }
