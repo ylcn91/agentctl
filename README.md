@@ -160,6 +160,13 @@ Run `actl` with no arguments to open the interactive dashboard.
 | `a` | Add | Add a new account interactively |
 | `e` | SLA | SLA violation board with escalations |
 | `r` | Prompts | Prompt library browser |
+| `n` | Analytics | Usage analytics and trends |
+| `w` | Workflows | Workflow execution board |
+| `h` | Health | Account health monitoring |
+| `c` | Council | Multi-model task analysis |
+| `v` | Verification | Task verification receipts |
+| `i` | Entire | Claude Enterprise session monitoring |
+| `g` | Chains | Delegation chain tracking |
 
 ### Keybindings
 
@@ -169,6 +176,7 @@ Run `actl` with no arguments to open the interactive dashboard.
 | `Enter` | Select |
 | `Escape` | Back to dashboard |
 | `q` | Quit |
+| `?` | Toggle help overlay |
 
 ---
 
@@ -386,6 +394,141 @@ Press `r` in the dashboard to browse the prompt library.
 
 ---
 
+## Workflow Automation
+
+When the `workflow` feature flag is enabled, agentctl supports YAML-based workflow automation with steps, conditions, and retries.
+
+### Workflow Definition
+
+```yaml
+name: code-review-pipeline
+trigger: on_task_handoff
+steps:
+  - id: analyze
+    action: council.analyze
+    input: "{{ task.goal }}"
+  - id: review
+    action: task.assign
+    condition: "{{ steps.analyze.complexity != 'critical' }}"
+    input:
+      assignee: "{{ steps.analyze.recommendedProvider }}"
+  - id: escalate
+    action: notification.send
+    condition: "{{ steps.analyze.complexity == 'critical' }}"
+```
+
+### TUI
+
+Press `w` in the dashboard to view workflow executions.
+
+---
+
+## Multi-Model Council
+
+When the `council` feature flag is enabled, agentctl can analyze tasks using multiple LLM models and reach consensus on approach, complexity, and provider selection.
+
+### How It Works
+
+1. Task goal is sent to multiple models via OpenRouter
+2. Each model returns analysis (complexity, duration, skills, risks)
+3. Models rank each other's responses
+4. Chairman model synthesizes consensus
+
+### Configuration
+
+```json
+{
+  "council": {
+    "models": ["anthropic/claude-3.5-sonnet", "google/gemini-2.0-flash"],
+    "chairman": "anthropic/claude-3.5-sonnet",
+    "apiKey": "your-openrouter-key"
+  }
+}
+```
+
+### TUI
+
+Press `c` in the dashboard to access the Council panel.
+
+---
+
+## Retrospectives
+
+When the `retro` feature flag is enabled, agentctl generates AI-powered post-session retrospectives.
+
+### Features
+
+- Collect evidence from Entire sessions (tokens, files modified, duration)
+- Prompt participants for feedback
+- Generate structured documentation with learnings
+- Track delta from past retrospectives
+
+### TUI
+
+Workflow retrospectives are viewable in the Workflow board (`w`).
+
+---
+
+## Health Monitoring
+
+When the `entireMonitoring` feature flag is enabled, agentctl monitors account health metrics.
+
+### Tracked Metrics
+
+- CPU/Memory usage trends
+- Error rate per account
+- Average response time
+- Session success rate
+
+### TUI
+
+Press `h` in the dashboard to view health dashboard.
+
+---
+
+## Delegation Chains
+
+Track task delegation depth to prevent accountability vacuums.
+
+### Configuration
+
+```json
+{
+  "delegationDepth": {
+    "maxDepth": 3,
+    "requireReauthAbove": 2
+  }
+}
+```
+
+### Rules
+
+- Tasks can be delegated up to `maxDepth` times
+- Beyond max depth, human re-authorization required
+- Warning issued when approaching limit
+
+### TUI
+
+Press `g` in the dashboard to view delegation chains.
+
+---
+
+## Claude Enterprise (Entire)
+
+When the `entireMonitoring` feature flag is enabled, agentctl integrates with Claude Enterprise for session monitoring.
+
+### Features
+
+- Track active Entire sessions per account
+- Session metadata: tokens, duration, files modified
+- Retro evidence collection for post-session reviews
+
+### TUI
+
+Press `i` in the dashboard to view Entire sessions.
+
+---
+
 ## Configuration
 
 Config file: `~/.agentctl/config.json`
@@ -422,7 +565,15 @@ Config file: `~/.agentctl/config.json`
     workspaceWorktree?: true,
     autoAcceptance?: true,
     capabilityRouting?: true,
-    slaEngine?: true
+    slaEngine?: true,
+    workflow?: true,
+    retro?: true,
+    sessions?: true,
+    trust?: true,
+    council?: true,
+    circuitBreaker?: true,
+    cognitiveFriction?: true,
+    entireMonitoring?: true
   },
   defaults: {
     launchInNewWindow: true,
@@ -444,6 +595,11 @@ Config file: `~/.agentctl/config.json`
 | `~/.agentctl/tokens/<name>.token` | Account auth tokens |
 | `~/.agentctl/messages/` | Message store |
 | `~/.agentctl/tasks.json` | Task board state |
+| `~/.agentctl/workflows.json` | Workflow definitions |
+| `~/.agentctl/workflow-runs.json` | Workflow execution history |
+| `~/.agentctl/health.json` | Account health data |
+| `~/.agentctl/delegation-chains.json` | Delegation chain tracking |
+| `~/.agentctl/retro.json` | Retrospective documents |
 | `~/.agentctl/daemon.pid` | Daemon PID file |
 | `~/.agentctl/hub.sock` | Daemon Unix socket |
 | `~/.agentctl/daemon.log` | Daemon log |
@@ -539,22 +695,32 @@ agentctl/
 │   ├── application/
 │   │   └── use-cases/           # Launch, dashboard, usage use-cases
 │   ├── components/
-│   │   ├── Dashboard.tsx        # Account cards view
-│   │   ├── TaskBoard.tsx        # Task kanban board
-│   │   ├── MessageInbox.tsx     # Message inbox
-│   │   ├── SLABoard.tsx         # SLA violation board
-│   │   ├── PromptLibrary.tsx    # Prompt browser
-│   │   ├── Launcher.tsx         # Quick-launch panel
-│   │   └── ...                  # Header, AddAccount, UsageDetail, etc.
+│   │   ├── Dashboard.tsx          # Account cards view
+│   │   ├── TaskBoard.tsx           # Task kanban board
+│   │   ├── MessageInbox.tsx        # Message inbox
+│   │   ├── SLABoard.tsx            # SLA violation board
+│   │   ├── PromptLibrary.tsx       # Prompt browser
+│   │   ├── Launcher.tsx            # Quick-launch panel
+│   │   ├── Analytics.tsx           # Usage analytics
+│   │   ├── WorkflowBoard.tsx       # Workflow execution board
+│   │   ├── WorkflowDetail.tsx      # Workflow run details
+│   │   ├── HealthDashboard.tsx     # Account health monitoring
+│   │   ├── CouncilPanel.tsx        # Multi-model analysis
+│   │   ├── VerificationView.tsx     # Task verification receipts
+│   │   ├── EntireSessions.tsx      # Claude Enterprise sessions
+│   │   ├── DelegationChain.tsx      # Delegation chain tracking
+│   │   └── ...                      # Header, AddAccount, UsageDetail, etc.
 │   ├── daemon/
-│   │   ├── server.ts            # Unix socket daemon
-│   │   ├── state.ts             # In-memory daemon state
-│   │   ├── framing.ts           # Newline-delimited JSON framing
-│   │   ├── workspace-manager.ts # Git worktree operations
-│   │   ├── workspace-store.ts   # Workspace persistence
-│   │   ├── capability-store.ts  # Account capability persistence
-│   │   ├── message-store.ts     # Message persistence
-│   │   └── auto-launcher.ts     # Auto-launch logic
+│   │   ├── server.ts              # Unix socket daemon
+│   │   ├── state.ts               # In-memory daemon state
+│   │   ├── framing.ts             # Newline-delimited JSON framing
+│   │   ├── health-monitor.ts      # Account health monitoring
+│   │   ├── health.ts              # Health status reporting
+│   │   ├── workspace-manager.ts   # Git worktree operations
+│   │   ├── workspace-store.ts     # Workspace persistence
+│   │   ├── capability-store.ts     # Account capability persistence
+│   │   ├── message-store.ts       # Message persistence
+│   │   └── auto-launcher.ts       # Auto-launch logic
 │   ├── mcp/
 │   │   ├── bridge.ts            # MCP server ↔ daemon bridge
 │   │   └── tools.ts             # 55 MCP tool registrations
@@ -567,17 +733,30 @@ agentctl/
 │   │   ├── cursor-agent.ts      # Cursor Agent provider
 │   │   └── registry.ts          # Provider registry
 │   ├── services/
-│   │   ├── account-manager.ts   # Account CRUD + shell aliases
-│   │   ├── tasks.ts             # Task board + lifecycle transitions
-│   │   ├── handoff.ts           # Handoff payload validation
-│   │   ├── handoff-templates.ts # Template CRUD
-│   │   ├── sla-engine.ts        # SLA threshold checks
+│   │   ├── account-manager.ts     # Account CRUD + shell aliases
+│   │   ├── tasks.ts                # Task board + lifecycle transitions
+│   │   ├── handoff.ts              # Handoff payload validation
+│   │   ├── handoff-templates.ts    # Template CRUD
+│   │   ├── sla-engine.ts           # SLA threshold checks
 │   │   ├── account-capabilities.ts # Capability scoring
-│   │   ├── workspace.ts         # Workspace types + validation
-│   │   ├── prompt-library.ts    # Prompt CRUD + search
-│   │   ├── notifications.ts     # OS notification dispatch
-│   │   ├── clipboard.ts         # Shared clipboard
-│   │   └── ...                  # file-store, cli-commands, help, etc.
+│   │   ├── workspace.ts             # Workspace types + validation
+│   │   ├── prompt-library.ts        # Prompt CRUD + search
+│   │   ├── notifications.ts         # OS notification dispatch
+│   │   ├── clipboard.ts             # Shared clipboard
+│   │   ├── workflow-engine.ts       # YAML workflow execution
+│   │   ├── workflow-parser.ts       # Workflow YAML parsing
+│   │   ├── workflow-store.ts         # Workflow state persistence
+│   │   ├── retro-engine.ts          # Post-session retrospectives
+│   │   ├── retro-store.ts           # Retro document storage
+│   │   ├── council.ts               # Multi-model analysis
+│   │   ├── council-config.ts        # Council configuration
+│   │   ├── health-monitor.ts        # Account health tracking
+│   │   ├── delegation-depth.ts       # Delegation chain tracking
+│   │   ├── circuit-breaker.ts        # Failure handling
+│   │   ├── cognitive-friction.ts     # Task difficulty tracking
+│   │   ├── entire-integration.ts     # Claude Enterprise integration
+│   │   ├── entire-adapter.ts        # Entire session adapter
+│   │   └── ...                       # file-store, cli-commands, help, etc.
 │   └── terminals/
 │       ├── wezterm.ts           # WezTerm profile
 │       ├── iterm.ts             # iTerm2 profile
