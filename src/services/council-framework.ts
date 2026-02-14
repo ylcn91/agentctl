@@ -46,14 +46,19 @@ interface ProviderCommand {
   parseOutput: (stdout: string) => string;
 }
 
+function expandHome(p: string): string {
+  return p.startsWith("~/") ? p.replace("~", process.env.HOME ?? "") : p;
+}
+
 export function buildProviderCommand(account: AccountConfig, _prompt: string): ProviderCommand {
   const baseEnv: Record<string, string> = {};
+  const configDir = expandHome(account.configDir);
 
   switch (account.provider) {
     case "claude-code":
       return {
         cmd: ["claude", "-p", "--output-format", "json"],
-        env: { ...baseEnv, CLAUDE_CONFIG_DIR: account.configDir },
+        env: { ...baseEnv, CLAUDE_CONFIG_DIR: configDir },
         parseOutput: (stdout: string) => {
           try {
             const json = JSON.parse(stdout);
@@ -66,7 +71,7 @@ export function buildProviderCommand(account: AccountConfig, _prompt: string): P
     case "codex-cli":
       return {
         cmd: ["codex", "-q"],
-        env: { ...baseEnv, CODEX_HOME: account.configDir },
+        env: { ...baseEnv, CODEX_HOME: configDir },
         parseOutput: (stdout: string) => stdout,
       };
     case "opencode":
@@ -129,11 +134,13 @@ export function createAccountCaller(accounts: AccountConfig[], timeoutMs?: numbe
     const prompt = `${systemPrompt}\n\n${userPrompt}`;
     const { cmd, env, parseOutput } = buildProviderCommand(account, prompt);
 
+    // Remove CLAUDECODE to allow spawning nested Claude CLI processes
+    const { CLAUDECODE: _, ...cleanEnv } = process.env;
     const proc = Bun.spawn(cmd, {
       stdin: new Response(prompt).body,
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, ...env },
+      env: { ...cleanEnv, ...env },
     });
 
     let timerId: ReturnType<typeof setTimeout> | undefined;
