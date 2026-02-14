@@ -12,18 +12,44 @@ env:
   TAG_REF: ${{ github.ref }}
 
 jobs:
-  build:
+  build-macos:
+    runs-on: macos-latest
     strategy:
       matrix:
         include:
-          - os: macos-latest
-            target: darwin-arm64
-          - os: macos-13
-            target: darwin-x64
-          - os: ubuntu-latest
-            target: linux-x64
+          - target: darwin-arm64
+            bun_target: bun-darwin-arm64
+          - target: darwin-x64
+            bun_target: bun-darwin-x64
+    steps:
+      - uses: actions/checkout@v4
 
-    runs-on: ${{ matrix.os }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build standalone binary
+        run: |
+          bun build --compile --target ${{ matrix.bun_target }} src/cli.tsx --outfile dist/actl
+          chmod +x dist/actl
+
+      - name: Package binary
+        run: |
+          cd dist
+          tar -czf actl-${{ matrix.target }}.tar.gz actl
+          shasum -a 256 actl-${{ matrix.target }}.tar.gz > actl-${{ matrix.target }}.tar.gz.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: actl-${{ matrix.target }}
+          path: |
+            dist/actl-${{ matrix.target }}.tar.gz
+            dist/actl-${{ matrix.target }}.tar.gz.sha256
+
+  build-linux:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -41,18 +67,18 @@ jobs:
       - name: Package binary
         run: |
           cd dist
-          tar -czf actl-${{ matrix.target }}.tar.gz actl
-          shasum -a 256 actl-${{ matrix.target }}.tar.gz > actl-${{ matrix.target }}.tar.gz.sha256
+          tar -czf actl-linux-x64.tar.gz actl
+          shasum -a 256 actl-linux-x64.tar.gz > actl-linux-x64.tar.gz.sha256
 
       - uses: actions/upload-artifact@v4
         with:
-          name: actl-${{ matrix.target }}
+          name: actl-linux-x64
           path: |
-            dist/actl-${{ matrix.target }}.tar.gz
-            dist/actl-${{ matrix.target }}.tar.gz.sha256
+            dist/actl-linux-x64.tar.gz
+            dist/actl-linux-x64.tar.gz.sha256
 
   release:
-    needs: build
+    needs: [build-macos, build-linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -77,6 +103,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ylcn91/homebrew-agentctl
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -128,5 +157,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/agentctl.rb
-          git diff --cached --quiet || git commit -m "chore: update Homebrew formula to ${TAG_REF#refs/tags/}"
+          git diff --cached --quiet || git commit -m "update formula to ${TAG_REF#refs/tags/}"
           git push
