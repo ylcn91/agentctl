@@ -151,13 +151,18 @@ export class DaemonState {
 
   close(): void {
     if (this.slaTimerId) clearInterval(this.slaTimerId);
-    this.workspaceStore?.close();
-    this.capabilityStore?.close();
-    this.knowledgeStore?.close();
-    this.externalLinkStore?.close();
-    this.activityStore?.close();
-    this.workflowStore?.close();
-    this.retroStore?.close();
-    this.store.close();
+    const stores = [
+      this.workspaceStore,
+      this.capabilityStore,
+      this.knowledgeStore,
+      this.externalLinkStore,
+      this.activityStore,
+      this.workflowStore,
+      this.retroStore,
+      this.store,
+    ];
+    for (const s of stores) {
+      try { s?.close(); } catch (e: any) { console.error("[state] close error:", e.message); }
+    }
   }
 }

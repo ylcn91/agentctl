@@ -1,5 +1,5 @@
 import { createServer, type Server, type Socket } from "net";
-import { existsSync, unlinkSync, writeFileSync, readFileSync, mkdirSync } from "fs";
+import { existsSync, unlinkSync, writeFileSync, readFileSync, mkdirSync, chmodSync } from "fs";
 import { dirname } from "path";
 import { timingSafeEqual } from "crypto";
 import { DaemonState } from "./state";
@@ -14,14 +14,13 @@ import { checkStaleTasks, formatEscalationMessage, DEFAULT_SLA_CONFIG } from "..
 import { computeWorkloadSnapshots, computeWorkloadModifier } from "../services/workload-metrics";
 import { getHealthStatus } from "./health";
 import { startWatchdog } from "./watchdog";
-import { getHubDir, getSockPath, getPidPath, getTokensDir, getActivityDbPath } from "../paths";
+import { getHubDir, getSockPath, getPidPath, getTokensDir } from "../paths";
 import { scanWorkflowDir } from "../services/workflow-parser";
+import { ACCOUNT_NAME_RE } from "../services/account-manager";
 import { join } from "path";
 
-const SAFE_ACCOUNT_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$/;
-
 export async function verifyAccountToken(account: string, token: string): Promise<boolean> {
-  if (!SAFE_ACCOUNT_NAME_RE.test(account)) return false;
+  if (!ACCOUNT_NAME_RE.test(account)) return false;
   const tokenPath = `${getTokensDir()}/${account}.token`;
   try {
     const stored = (await Bun.file(tokenPath).text()).trim();
@@ -37,6 +36,7 @@ function reply(msg: any, response: object): string {
 }
 
 function safeWrite(socket: Socket, data: string): void {
+  if (socket.destroyed || !socket.writable) return;
   const ok = socket.write(data);
   if (!ok) {
     socket.once("drain", () => {});
@@ -128,7 +128,7 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
     let authenticated = false;
     let accountName = "";
     let authAttempts = 0;
-    let totalBytes = 0;
+    let pendingBytes = 0;
 
     // Connection expiry: 30-minute idle timeout
     let idleTimer = setTimeout(() => socket.end(), IDLE_TIMEOUT_MS);
@@ -138,7 +138,7 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
     };
 
     const parser = createLineParser((msg) => {
-      totalBytes = 0;
+      pendingBytes = 0;
       resetIdleTimer();
 
       // Allow unauthenticated ping for health checks (reveals no data)
@@ -156,13 +156,18 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
             return;
           }
           (async () => {
-            if (await verifyAccountToken(msg.account, msg.token)) {
-              authenticated = true;
-              accountName = msg.account;
-              state.connectAccount(accountName, msg.token);
-              safeWrite(socket, reply(msg, { type: "auth_ok" }));
-            } else {
-              safeWrite(socket, reply(msg, { type: "auth_fail", error: "Invalid token" }));
+            try {
+              if (await verifyAccountToken(msg.account, msg.token)) {
+                authenticated = true;
+                accountName = msg.account;
+                state.connectAccount(accountName, msg.token);
+                safeWrite(socket, reply(msg, { type: "auth_ok" }));
+              } else {
+                safeWrite(socket, reply(msg, { type: "auth_fail", error: "Invalid token" }));
+                socket.end();
+              }
+            } catch (err: any) {
+              safeWrite(socket, reply(msg, { type: "auth_fail", error: err.message ?? "Auth error" }));
               socket.end();
             }
           })();
@@ -206,12 +211,11 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
             safeWrite(socket, reply(msg, { type: "error", error: "Invalid field: offset" }));
             return;
           }
-          const limit = msg.limit as number | undefined;
-          const offset = msg.offset as number | undefined;
-          const messages = (limit !== undefined || offset !== undefined)
-            ? state.getMessages(accountName, { limit, offset })
+          const hasPagination = msg.limit !== undefined || msg.offset !== undefined;
+          const messages = hasPagination
+            ? state.getMessages(accountName, { limit: msg.limit as number | undefined, offset: msg.offset as number | undefined })
             : state.getUnreadMessages(accountName);
-          if (limit === undefined && offset === undefined) {
+          if (!hasPagination) {
             state.markAllRead(accountName);
           }
           safeWrite(socket, reply(msg, { type: "result", messages }));
@@ -754,12 +758,24 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
       };
 
       const handler = handlers[msg.type];
-      if (handler) handler(msg);
+      if (handler) {
+        try {
+          const result: unknown = handler(msg);
+          // Catch rejections from async handlers
+          if (result instanceof Promise) {
+            result.catch((err: any) => {
+              safeWrite(socket, reply(msg, { type: "error", error: err.message ?? "Internal error" }));
+            });
+          }
+        } catch (err: any) {
+          safeWrite(socket, reply(msg, { type: "error", error: err.message ?? "Internal error" }));
+        }
+      }
     });
 
     socket.on("data", (data) => {
-      totalBytes += data.length;
-      if (totalBytes > MAX_PAYLOAD_BYTES) {
+      pendingBytes += data.length;
+      if (pendingBytes > MAX_PAYLOAD_BYTES) {
         socket.destroy();
         return;
       }
@@ -773,6 +789,8 @@ export function startDaemon(opts?: DaemonOpts): { server: Server; state: DaemonS
   });
 
   server.listen(sockPath, () => {
+    // Restrict socket to owner-only access (rw-------)
+    try { chmodSync(sockPath, 0o600); } catch {}
     writeFileSync(getPidPath(), String(process.pid));
   });
 

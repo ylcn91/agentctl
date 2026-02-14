@@ -71,20 +71,22 @@ export async function loadConfig(path?: string): Promise<HubConfig> {
   if (!raw) return { ...DEFAULT_CONFIG };
 
   // Tolerant parsing: use defaults for missing fields
+  const rawEntire = raw.entire as Record<string, unknown> | undefined;
+  const rawDefaults = raw.defaults as Record<string, unknown> | undefined;
   const assembled: HubConfig = {
     schemaVersion: (raw.schemaVersion as number) ?? DEFAULT_CONFIG.schemaVersion,
     accounts: Array.isArray(raw.accounts) ? raw.accounts as AccountConfig[] : [],
     entire: {
-      autoEnable: (raw.entire as any)?.autoEnable ?? DEFAULT_CONFIG.entire.autoEnable,
+      autoEnable: (rawEntire?.autoEnable as boolean) ?? DEFAULT_CONFIG.entire.autoEnable,
     },
     features: (raw.features as FeatureFlags) ?? undefined,
     notifications: (raw.notifications as HubConfig["notifications"]) ?? undefined,
     github: (raw.github as HubConfig["github"]) ?? undefined,
     defaults: {
-      launchInNewWindow: (raw.defaults as any)?.launchInNewWindow ?? DEFAULT_CONFIG.defaults.launchInNewWindow,
+      launchInNewWindow: (rawDefaults?.launchInNewWindow as boolean) ?? DEFAULT_CONFIG.defaults.launchInNewWindow,
       quotaPolicy: {
         ...DEFAULT_CONFIG.defaults.quotaPolicy,
-        ...((raw.defaults as any)?.quotaPolicy ?? {}),
+        ...((rawDefaults?.quotaPolicy as Record<string, unknown>) ?? {}),
       },
     },
   };

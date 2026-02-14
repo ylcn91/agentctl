@@ -38,7 +38,7 @@ function getTokensDir(): string {
   return getTokensDirFromPaths();
 }
 
-const ACCOUNT_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$/;
+export const ACCOUNT_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$/;
 
 export function validateAccountName(name: string): void {
   if (!ACCOUNT_NAME_RE.test(name)) {

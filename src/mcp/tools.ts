@@ -127,7 +127,7 @@ export function registerTools(server: McpServer, sendToDaemon: DaemonSender, acc
       days: z.number().optional().describe("Days old to archive (default 7)"),
     },
   }, async (args) => {
-    const result = await sendToDaemon({ type: "archive_messages", days: args.days });
+    const result = await sendToDaemon({ type: "archive_messages", days: args.days ?? 7 });
     return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
   });
 

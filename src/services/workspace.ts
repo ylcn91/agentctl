@@ -1,4 +1,5 @@
 import { resolve } from "path";
+import { realpathSync, existsSync, lstatSync } from "fs";
 
 export type WorkspaceStatus = "preparing" | "ready" | "failed" | "cleaning";
 
@@ -94,7 +95,15 @@ export function isActiveStatus(status: WorkspaceStatus): boolean {
 
 export function computeWorktreePath(repoPath: string, branch: string): string {
   const safeBranch = branch.replace(/\//g, "-");
-  const base = resolve(repoPath, ".worktrees");
+  // Resolve repoPath through symlinks to prevent symlink-based path traversal
+  const realRepoPath = existsSync(repoPath) ? realpathSync(repoPath) : repoPath;
+  if (existsSync(repoPath) && repoPath !== realRepoPath) {
+    const stat = lstatSync(repoPath);
+    if (stat.isSymbolicLink()) {
+      throw new Error("repoPath must not be a symlink");
+    }
+  }
+  const base = resolve(realRepoPath, ".worktrees");
   const proposed = resolve(base, safeBranch);
   if (!proposed.startsWith(base + "/") && proposed !== base) {
     throw new Error("Path traversal detected");
