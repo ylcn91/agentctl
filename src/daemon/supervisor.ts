@@ -15,8 +15,8 @@ const DEFAULTS: SupervisorConfig = {
   maxRestarts: 5,
   restartDelayMs: 1_000,
   gracefulShutdownMs: 5_000,
-  sockPath: "",       // must be provided
-  daemonScript: "",   // must be provided
+  sockPath: "",
+  daemonScript: "",
 };
 
 export function startSupervisor(config: Partial<SupervisorConfig> & Pick<SupervisorConfig, "sockPath" | "daemonScript">): { stop: () => Promise<void> } {
@@ -36,7 +36,6 @@ export function startSupervisor(config: Partial<SupervisorConfig> & Pick<Supervi
   async function restart(): Promise<void> {
     if (stopped) return;
 
-    // Circuit breaker: reset window if > 5 min
     if (Date.now() - restartWindowStart > 5 * 60 * 1000) {
       restartCount = 0;
       restartWindowStart = Date.now();
@@ -55,14 +54,12 @@ export function startSupervisor(config: Partial<SupervisorConfig> & Pick<Supervi
     if (stopped) return;
 
     child = spawnDaemon();
-    // Wait a bit for daemon to start
+
     await new Promise(r => setTimeout(r, 2000));
   }
 
-  // Initial spawn
   child = spawnDaemon();
 
-  // Start health check loop
   healthCheckTimer = setInterval(async () => {
     if (stopped) return;
     const healthy = await selfTest(cfg.sockPath);
@@ -82,7 +79,7 @@ export function startSupervisor(config: Partial<SupervisorConfig> & Pick<Supervi
       if (healthCheckTimer) clearInterval(healthCheckTimer);
       if (child) {
         child.kill("SIGTERM");
-        // Wait for graceful shutdown
+
         const deadline = Date.now() + cfg.gracefulShutdownMs;
         while (child.exitCode === null && Date.now() < deadline) {
           await new Promise(r => setTimeout(r, 100));

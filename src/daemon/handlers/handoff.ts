@@ -28,7 +28,6 @@ export function registerHandoffHandlers(ctx: HandlerContext): Record<string, Han
         return;
       }
 
-      // F-13: Delegation depth check
       let depthConfig = features?.delegationDepth;
       if (!depthConfig) {
         try {
@@ -40,7 +39,6 @@ export function registerHandoffHandlers(ctx: HandlerContext): Record<string, Han
       }
       const depthCheck = checkDelegationDepth(validation.payload, depthConfig);
 
-      // Emit DELEGATION_CHAIN event for audit trail
       const chain = [accountName, msg.to];
       if (validation.payload.parent_handoff_id) {
         chain.unshift(validation.payload.parent_handoff_id);
@@ -72,7 +70,6 @@ export function registerHandoffHandlers(ctx: HandlerContext): Record<string, Han
         return;
       }
 
-      // Auto-collect context if projectDir is available
       let autoContext: any = undefined;
       const ctx2 = msg.context ?? {};
       if (ctx2.projectDir) {
@@ -99,7 +96,6 @@ export function registerHandoffHandlers(ctx: HandlerContext): Record<string, Han
       const handoffId = state.addMessage(handoffMsg);
       notifyHandoff(accountName, msg.to, validation.payload.goal).catch(e => console.error("[notify]", e.message));
 
-      // Create a corresponding task on the task board
       try {
         let board = await loadTasks();
         const task = {
@@ -114,7 +110,6 @@ export function registerHandoffHandlers(ctx: HandlerContext): Record<string, Han
         await saveTasks(board);
       } catch (e: any) { console.error("[handoff-task-create]", e.message); }
 
-      // F-02: Emit TASK_CREATED event
       state.eventBus.emit({
         type: "TASK_CREATED",
         taskId: handoffId,
@@ -126,6 +121,13 @@ export function registerHandoffHandlers(ctx: HandlerContext): Record<string, Han
           verifiability: validation.payload.verifiability,
           reversibility: validation.payload.reversibility,
         },
+      });
+      state.eventBus.emit({
+        type: "TASK_ASSIGNED",
+        taskId: handoffId,
+        delegator: accountName,
+        delegatee: msg.to,
+        reason: "handoff_created",
       });
 
       safeWrite(socket, reply(msg, {
@@ -198,7 +200,6 @@ export function registerHandoffHandlers(ctx: HandlerContext): Record<string, Han
 
         const { autoContext, ...payloadWithoutAuto } = payload;
 
-        // F-02: Emit TASK_ASSIGNED event
         state.eventBus.emit({
           type: "TASK_ASSIGNED",
           taskId: msg.handoffId,
@@ -226,7 +227,6 @@ export function registerHandoffHandlers(ctx: HandlerContext): Record<string, Han
         const capabilities = state.capabilityStore.getAll();
         const skills: string[] = msg.skills ?? [];
 
-        // Enrich capabilities with trust scores from TrustStore
         if (state.trustStore) {
           for (const cap of capabilities) {
             const rep = state.trustStore.get(cap.accountName);

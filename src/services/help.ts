@@ -1,6 +1,5 @@
 import chalk from "chalk";
 
-// "91" ANSI Shadow art — displayed on startup and help, like Claude Code's mascot
 export const MASCOT_LINES = [
   " █████╗   ██╗",
   "██╔══██╗ ███║",
@@ -13,8 +12,8 @@ export const MASCOT_LINES = [
 const SHADOW_CHARS = "╔╗╚╝═║";
 
 export function coloredMascot(): string {
-  const face = chalk.hex("#89b4fa");  // Catppuccin Blue — block face
-  const edge = chalk.hex("#585b70");  // Catppuccin Surface1 — shadow edges
+  const face = chalk.hex("#89b4fa");
+  const edge = chalk.hex("#585b70");
   return MASCOT_LINES.map((line) =>
     [...line].map((ch) =>
       ch === " " ? ch : SHADOW_CHARS.includes(ch) ? edge(ch) : face(ch)

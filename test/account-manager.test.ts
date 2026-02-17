@@ -15,7 +15,6 @@ const TEST_CONFIG = join(TEST_DIR, "config.json");
 const TEST_TOKENS = join(TEST_DIR, "tokens");
 const TEST_ACCOUNTS_DIR = join(TEST_DIR, "accounts");
 
-// Point env to test dir so config/tokens go to isolated location
 const origHubDir = process.env.AGENTCTL_DIR;
 
 beforeEach(() => {
@@ -168,16 +167,13 @@ describe("setupAccount", () => {
   });
 
   test("creates symlinks when source dirs exist", async () => {
-    // Create fake ~/.claude with plugins dir
     const fakeClaudeDir = join(TEST_DIR, "fake-claude");
     const pluginsDir = join(fakeClaudeDir, "plugins");
     mkdirSync(pluginsDir, { recursive: true });
 
-    // Temporarily override HOME
     const origHome = process.env.HOME;
     process.env.HOME = TEST_DIR;
 
-    // Create .claude/plugins in our fake home
     const dotClaudePlugins = join(TEST_DIR, ".claude", "plugins");
     mkdirSync(dotClaudePlugins, { recursive: true });
 
@@ -266,7 +262,6 @@ describe("teardownAccount", () => {
 
     await teardownAccount("nopurge", { configPath: TEST_CONFIG });
 
-    // Config dir should still exist
     expect(existsSync(configDir)).toBe(true);
   });
 });
@@ -309,7 +304,6 @@ describe("addShellAlias", () => {
     const origHome = process.env.HOME;
     process.env.HOME = TEST_DIR;
 
-    // Create existing .zshrc
     writeFileSync(join(TEST_DIR, ".zshrc"), "# existing content\n");
 
     try {
@@ -334,7 +328,6 @@ describe("addShellAlias", () => {
       expect(modified).toBe(true);
 
       const zshrc = readFileSync(join(TEST_DIR, ".zshrc"), "utf-8");
-      // The single quote should be escaped so it doesn't break the alias
       expect(zshrc).toContain("# agentctl:squote");
       expect(zshrc).not.toContain("'/path/with'quote'");
       expect(zshrc).toContain("'\\''");

@@ -137,7 +137,6 @@ describe("migrateConfig", () => {
     expect(config.schemaVersion).toBe(1);
     expect(config.accounts).toHaveLength(1);
     expect(config.accounts[0].name).toBe("old-account");
-    // Should have defaults merged in
     expect(config.entire.autoEnable).toBe(true);
     expect(config.defaults.launchInNewWindow).toBe(true);
   });
@@ -188,13 +187,11 @@ describe("migrateConfig: detailed value preservation", () => {
 
     const config = await loadConfig(TEST_CONFIG);
     expect(config.accounts).toHaveLength(2);
-    // First account preserves all fields including quotaPolicy
     expect(config.accounts[0].name).toBe("dev");
     expect(config.accounts[0].configDir).toBe("~/.claude-dev");
     expect(config.accounts[0].color).toBe("#89b4fa");
     expect(config.accounts[0].label).toBe("Development");
     expect(config.accounts[0].provider).toBe("claude-code");
-    // Second account
     expect(config.accounts[1].name).toBe("ops");
     expect(config.accounts[1].provider).toBe("codex-cli");
   });
@@ -224,7 +221,6 @@ describe("migrateConfig: detailed value preservation", () => {
     expect(migrated).toBe(true);
 
     const config = await loadConfig(TEST_CONFIG);
-    // Custom entire.autoEnable should be preserved (overrides default)
     expect(config.entire.autoEnable).toBe(false);
   });
 
@@ -237,11 +233,9 @@ describe("migrateConfig: detailed value preservation", () => {
     const { backupPath } = await migrateConfig(TEST_CONFIG);
     expect(backupPath).not.toBeNull();
 
-    // Read backup and verify it has the original data
     const { readFileSync } = await import("fs");
     const backupContent = JSON.parse(readFileSync(backupPath!, "utf-8"));
     expect(backupContent.accounts[0].name).toBe("backup-test");
-    // Backup should NOT have schemaVersion (it's the original v0 data)
     expect(backupContent.schemaVersion).toBeUndefined();
   });
 
@@ -262,7 +256,7 @@ describe("loadConfig edge cases", () => {
       defaults: { launchInNewWindow: true, quotaPolicy: { plan: "max-5x", windowMs: 18000000, estimatedLimit: 225, source: "community-estimate" } },
     }));
     const config = await loadConfig(TEST_CONFIG);
-    expect(config.entire.autoEnable).toBe(true); // default
+    expect(config.entire.autoEnable).toBe(true);
   });
 
   test("tolerates missing defaults field", async () => {
@@ -273,7 +267,7 @@ describe("loadConfig edge cases", () => {
     }));
     const config = await loadConfig(TEST_CONFIG);
     expect(config.entire.autoEnable).toBe(false);
-    expect(config.defaults.launchInNewWindow).toBe(true); // default
+    expect(config.defaults.launchInNewWindow).toBe(true);
     expect(config.defaults.quotaPolicy.plan).toBe("max-5x");
   });
 
@@ -295,6 +289,6 @@ describe("loadConfig edge cases", () => {
       defaults: { launchInNewWindow: true, quotaPolicy: { plan: "max-5x", windowMs: 18000000, estimatedLimit: 225, source: "community-estimate" } },
     }));
     const config = await loadConfig(TEST_CONFIG);
-    expect(config.schemaVersion).toBe(1); // default
+    expect(config.schemaVersion).toBe(1);
   });
 });

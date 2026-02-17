@@ -42,9 +42,7 @@ describe("createLineParser", () => {
     const messages: any[] = [];
     const parser = createLineParser((msg) => messages.push(msg));
     parser.feed('{"buffered":true}');
-    // No newline yet, so nothing emitted
     expect(messages).toEqual([]);
-    // Now send the newline
     parser.feed('\n');
     expect(messages).toEqual([{ buffered: true }]);
   });
@@ -95,7 +93,6 @@ describe("frameSend", () => {
 
   test("does not contain embedded newlines", () => {
     const result = frameSend({ msg: "hello\nworld" });
-    // The JSON string should escape the newline, so split by \n should give [json, ""]
     const lines = result.split("\n");
     expect(lines.length).toBe(2);
     expect(lines[1]).toBe("");

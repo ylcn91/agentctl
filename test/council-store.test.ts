@@ -124,7 +124,6 @@ describe("council analysis persistence", () => {
 
     const cache = await loadCouncilCache(tempDir);
     expect(cache.analyses).toHaveLength(3);
-    // Most recent first (unshift order)
     expect(cache.analyses[0].taskGoal).toBe("Task C");
     expect(cache.analyses[1].taskGoal).toBe("Task B");
     expect(cache.analyses[2].taskGoal).toBe("Task A");

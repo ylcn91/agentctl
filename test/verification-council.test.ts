@@ -56,7 +56,6 @@ describe("verification-council", () => {
             reasoning: "All reviewers agree the task is complete",
           });
         }
-        // Stage 1 — individual review
         return JSON.stringify({
           verdict: "ACCEPT",
           confidence: 0.9,
@@ -223,7 +222,6 @@ describe("verification-council", () => {
       expect(result.receipt.timestamp).toBeTruthy();
       expect(result.receipt.specHash).toBeTruthy();
       expect(result.receipt.evidenceHash).toBeTruthy();
-      // specHash and evidenceHash should be different (different data)
       expect(result.receipt.specHash).not.toBe(result.receipt.evidenceHash);
     });
 
@@ -251,7 +249,6 @@ describe("verification-council", () => {
         { members: ["m"], chairman: "m", llmCaller: mockCaller },
       );
 
-      // Same handoff payload should produce the same specHash
       expect(r1.receipt.specHash).toBe(r2.receipt.specHash);
     });
   });
@@ -308,7 +305,6 @@ describe("verification-council", () => {
         { members: ["m"], chairman: "m", llmCaller: mockCaller },
       );
 
-      // Unknown verdicts normalize to REJECT
       expect(result.verdict).toBe("REJECT");
     });
   });

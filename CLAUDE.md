@@ -12,7 +12,7 @@ brew tap ylcn91/agentctl && brew install agentctl  # or install via Homebrew
 # Development
 bun test                                   # run all tests (~124 files)
 bun test test/<name>.test.ts               # run a single test file
-bun build --compile src/cli.tsx --outfile dist/actl  # build standalone binary
+bun run build  # build standalone binary
 
 # TUI & Daemon
 actl                                       # launch TUI dashboard
@@ -56,13 +56,12 @@ actl help [topic]                          # show help
 
 ## Architecture
 
-CLI (meow) -> TUI (Ink/React) -> Services -> Daemon (Unix socket) -> MCP bridge
+CLI (meow) -> TUI (SolidJS/OpenTUI) -> Services -> Daemon (Unix socket) -> MCP bridge
 
 Key directories:
-- `src/cli.tsx` -- CLI entry point & command router (20+ subcommands)
-- `src/app.tsx` -- TUI root (Ink)
-- `src/components/` -- Dashboard, TaskBoard, MessageInbox, SLABoard, CouncilPanel, DelegationChain, HealthDashboard, HelpOverlay, VerificationView, WorkflowBoard, WorkflowDetail, Analytics, PromptLibrary, EntireSessions, CommandPalette, Sidebar, etc.
-- `src/themes/` -- Theme system: `types.ts` (theme type definitions), `definitions.ts` (15 built-in themes), `index.ts` (exports & useTheme hook)
+- `src/cli.tsx` -- CLI entry point, `src/cli-router.ts` -- command dispatch (20+ subcommands)
+- `src/tui/` -- TUI root (SolidJS/OpenTUI): `app.tsx` entry, `views/` (dashboard, tasks, inbox, sla, council, health, workflows, etc.), `routes/chat/` (chat view, message list, input bar), `ui/` (command-palette, help-overlay, sidebar, header, dialog, border), `context/` (theme, keybind, exit), `themes/` (35 JSON theme files)
+- `src/tui/themes/` -- JSON theme definitions (catppuccin, tokyonight, dracula, gruvbox, nord, etc.)
 - `src/daemon/` -- Unix socket server, state, framing, stores (message, workspace, capability, knowledge, session, trust), health-monitor, watchdog, supervisor, config-watcher, shared-session
 - `src/mcp/` -- MCP bridge (`bridge.ts`) + tool registrations split into `tools/` domain modules (messaging, handoff, tasks, workspace, prompts, github, review, knowledge, analytics, workflow, retro, health, sessions, search)
 - `src/services/` -- Business logic (50+ modules): account-manager, tasks, handoff, sla-engine, council, council-store, event-bus, circuit-breaker, cognitive-friction, verification-council, verification-receipts, adaptive-coordinator, progress-tracker, delegation-depth, provider-profiles, input-sanitizer, workflow-engine, workflow-parser, retro-engine, analytics, etc.
@@ -70,12 +69,16 @@ Key directories:
 - `src/providers/` -- claude-code, codex-cli, openhands, gemini-cli, opencode, cursor-agent (6 providers)
 - `src/terminals/` -- WezTerm, iTerm2, GNOME, Windows Terminal
 - `src/integrations/` -- GitHub issue/PR linking, WezTerm integration
-- `src/hooks/` -- Shared React hooks (useListNavigation)
+- `src/hooks/` -- Shared hooks (useAgentStreams, useChatSession, useChunkBatching)
 - `src/application/use-cases/` -- Application-layer use cases (launch-account, load-dashboard-data, load-usage-data)
 - `src/types.ts` -- Shared types, constants, path re-exports
 - `src/paths.ts` -- All file path functions (20+), override base dir with `AGENTCTL_DIR` env var
 - `src/config.ts` -- Zod-validated config with migration support
 - `test/` -- All test files (flat, named `<module>.test.ts`)
+
+## Style
+
+- No descriptive comments in code -- no `// Section name`, `{/* Description */}`, or `// -- label --` markers. Code should be self-explanatory.
 
 ## Code Patterns
 
@@ -87,8 +90,8 @@ Key directories:
 - **Task lifecycle**: `todo -> in_progress -> ready_for_review -> accepted/rejected`. Rejection bounces back to `in_progress` automatically. Enforced transitions in `src/services/tasks.ts` via `VALID_TRANSITIONS` map. Tasks support priority (P0/P1/P2), due dates, tags, workspace context, and event history
 - **Event bus**: `src/services/event-bus.ts` defines a discriminated union of delegation lifecycle events (TASK_CREATED, TASK_ASSIGNED, CHECKPOINT_REACHED, PROGRESS_UPDATE, etc.). Used for observability across the system
 - **Council**: Multi-account analysis (`src/services/council.ts`) and verification (`src/services/verification-council.ts`). Both flows route through daemon handlers (`src/daemon/handlers/council.ts`) for consistent feature-flag gating. LLM timeout enforced via `Promise.race` in `council-framework.ts` (configurable `timeoutMs`, default 30s). Results persisted via `src/services/council-store.ts` for CouncilPanel UI history. Config: `council.members`, `council.chairman`, `council.timeoutMs`. Feature-gated on `council` flag
-- **Themes**: 15 built-in themes in `src/themes/`. Config: `theme?: string` field in HubConfig. Set via `actl config set theme "tokyonight"`. All 24 components use `useTheme()` hook
-- **Command Palette**: `Ctrl+P` opens fuzzy-search overlay for all views and actions (`src/components/CommandPalette.tsx`)
+- **Themes**: 35 JSON themes in `src/tui/themes/`. Config: `theme?: string` field in HubConfig. Set via `actl config set theme "tokyonight"`. All views use `useTheme()` from `src/tui/context/theme.tsx`
+- **Command Palette**: `Ctrl+P` opens fuzzy-search overlay for all views and actions (`src/tui/ui/command-palette.tsx`)
 - **Leader Keys**: `Ctrl+X` prefix with 500ms chord timeout. `Ctrl+X b` toggles info sidebar, `Ctrl+X p` opens command palette
 - **Input sanitizer**: `src/services/input-sanitizer.ts` -- validate/sanitize all external inputs. Includes `sanitizeShellCommand()` for acceptance runner (blocks injection patterns), `sanitizeSearchQuery()` for search stores, and `sanitizeHandoffPayload()` for handoff validation
 - **CLI validation**: All CLI commands validate inputs via Zod schemas in `src/daemon/schemas.ts` (ConfigSetArgsSchema, SessionNameArgsSchema, LaunchDirSchema, SearchPatternSchema, AddAccountArgsSchema) before passing to services
@@ -120,7 +123,7 @@ Search: search_across_accounts
 
 ## Build & Release
 
-- `bun build --compile src/cli.tsx --outfile dist/actl` -- standalone binary
+- `bun run build` -- standalone binary
 - `.github/workflows/release.yml` -- builds macOS (arm64/x64) + Linux (x64) binaries on tag push
 - Release flow: push a `v*` tag -> GitHub Actions builds binaries -> creates release -> updates Homebrew formula
 - Check release status: `gh run list --limit 5`
@@ -137,6 +140,6 @@ Search: search_across_accounts
 - Provider list has 6 entries: claude-code, codex-cli, openhands, gemini-cli, opencode, cursor-agent
 - Daemon supervisor (`actl daemon supervise`) auto-restarts the daemon on crash
 - `config reload` sends a `config_reload` message over the socket -- requires daemon to be running
-- `COMMANDS` array in `CommandPalette.tsx` is exported and tested for exact count in `test/command-palette.test.ts` -- update the count test when adding/removing commands
-- Large TUI components use `React.memo()` -- `typeof` check returns "object" not "function"; use `expect(Component).toBeTruthy()` in tests
+- `COMMANDS` array in `src/tui/ui/command-palette.tsx` is exported and tested for exact count in `test/command-palette.test.ts` -- update the count test when adding/removing commands
+- TUI uses SolidJS reactivity (createSignal, createEffect, Show, For) -- not React hooks
 - Daemon handler modules live in `src/daemon/handlers/` (messaging, handoff, tasks, workspace, council, knowledge, sessions, workflow, health, misc) -- add new handlers there, not in server.ts

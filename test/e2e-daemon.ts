@@ -1,9 +1,3 @@
-/**
- * E2E Multi-Agent Test — exercises all 20 steps from prompts/e2e-multi-agent-test.md
- * Connects directly to the daemon Unix socket as claude-admin.
- *
- * Usage: bun test/e2e-daemon.ts
- */
 
 import { connect } from "node:net";
 import { homedir } from "node:os";
@@ -14,7 +8,6 @@ const SOCKET = join(homedir(), ".agentctl", "hub.sock");
 const TOKEN = readFileSync(join(homedir(), ".agentctl", "tokens", "claude-admin.token"), "utf-8").trim();
 const ACCOUNT = "claude-admin";
 
-// ─── Protocol helpers ────────────────────────────────────────────────
 let reqCounter = 0;
 function makeId(): string {
   return `e2e-${Date.now()}-${++reqCounter}`;

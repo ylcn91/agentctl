@@ -1,5 +1,3 @@
-// F-01: Enriched Handoff Contract Schema
-// Paper ref: Section 2.2 (Task Characteristics), Section 4.1 (Task Decomposition)
 
 import { sanitizeHandoffPayload, sanitizeStringFields, type SanitizationResult } from "./input-sanitizer";
 
@@ -18,13 +16,11 @@ export interface VerificationPolicy {
 }
 
 export interface HandoffPayload {
-  // Core fields (required)
   goal: string;
   acceptance_criteria: string[];
   run_commands: string[];
   blocked_by: string[];
 
-  // Task Characteristics (Paper §2.2) — all optional for backward compatibility
   complexity?: ComplexityLevel;
   criticality?: CriticalityLevel;
   uncertainty?: UncertaintyLevel;
@@ -37,12 +33,10 @@ export interface HandoffPayload {
   required_skills?: string[];
   resource_requirements?: string[];
 
-  // Delegation Intelligence (Paper §4.2)
   autonomy_level?: AutonomyLevel;
   monitoring_level?: MonitoringLevel;
   verification_policy?: VerificationPolicy;
 
-  // Delegation chain tracking (Paper §5.2)
   delegation_depth?: number;
   parent_handoff_id?: string;
 }
@@ -71,7 +65,6 @@ export function validateHandoff(payload: unknown): { valid: true; payload: Hando
   const errors: HandoffValidationError[] = [];
   const obj = payload as Record<string, unknown> | null | undefined;
 
-  // F-12: Input sanitization — run before structural validation
   let sanitizationResult: SanitizationResult | undefined;
   if (obj && typeof obj === "object") {
     sanitizationResult = sanitizeHandoffPayload(obj);
@@ -81,11 +74,10 @@ export function validateHandoff(payload: unknown): { valid: true; payload: Hando
         errors: sanitizationResult.errors.map(e => ({ field: e.field, message: e.message })),
       };
     }
-    // Strip control characters from string fields
+
     sanitizeStringFields(obj);
   }
 
-  // Required fields
   if (!obj?.goal || typeof obj.goal !== "string" || obj.goal.trim() === "") {
     errors.push({ field: "goal", message: "goal is required and cannot be empty" });
   }
@@ -108,7 +100,6 @@ export function validateHandoff(payload: unknown): { valid: true; payload: Hando
     errors.push({ field: "blocked_by", message: "all blocked_by entries must be non-empty strings" });
   }
 
-  // Optional enriched fields — validate only when present
   if (obj) {
     validateEnum(obj.complexity, "complexity", VALID_COMPLEXITY, errors);
     validateEnum(obj.criticality, "criticality", VALID_CRITICALITY, errors);
@@ -146,7 +137,6 @@ export function validateHandoff(payload: unknown): { valid: true; payload: Hando
 
   if (errors.length > 0) return { valid: false, errors };
 
-  // Build validated payload, preserving optional enriched fields when present
   const validated: HandoffPayload = {
     goal: obj!.goal as string,
     acceptance_criteria: obj!.acceptance_criteria as string[],
@@ -154,7 +144,6 @@ export function validateHandoff(payload: unknown): { valid: true; payload: Hando
     blocked_by: obj!.blocked_by as string[],
   };
 
-  // Copy optional enriched fields
   if (obj!.complexity !== undefined) validated.complexity = obj!.complexity as ComplexityLevel;
   if (obj!.criticality !== undefined) validated.criticality = obj!.criticality as CriticalityLevel;
   if (obj!.uncertainty !== undefined) validated.uncertainty = obj!.uncertainty as UncertaintyLevel;

@@ -19,7 +19,6 @@ export const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
   },
 };
 
-// macOS notification via terminal-notifier (custom icon, clickable)
 export async function sendNotification(
   title: string,
   body: string,
@@ -40,7 +39,6 @@ export async function sendNotification(
   }
 }
 
-// Load notification config from hub config
 export async function loadNotificationConfig(): Promise<NotificationConfig> {
   try {
     const { getConfigPath } = await import("../paths.js");
@@ -56,7 +54,6 @@ function isMuted(from: string, config: NotificationConfig): boolean {
   return config.muteList?.includes(from) ?? false;
 }
 
-// Event-specific notifications
 export async function notifyRateLimit(accountName: string, config?: NotificationConfig): Promise<void> {
   const cfg = config ?? await loadNotificationConfig();
   if (!cfg.enabled || !cfg.events.rateLimit) return;

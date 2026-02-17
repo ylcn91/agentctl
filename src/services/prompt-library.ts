@@ -49,7 +49,6 @@ export async function getPrompt(id: string): Promise<SavedPrompt | null> {
   const store = await loadStore();
   const prompt = store.prompts.find((p) => p.id === id);
   if (!prompt) return null;
-  // Increment usage count
   prompt.usageCount++;
   prompt.updatedAt = new Date().toISOString();
   await atomicWrite(PROMPTS_PATH, store);

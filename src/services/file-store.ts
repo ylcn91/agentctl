@@ -28,23 +28,20 @@ export async function acquireLock(
 
   await mkdir(dirname(lockPath), { recursive: true });
 
-  // If lockPath is an existing regular file (e.g. stale lock from old format),
-  // check staleness and remove it before trying mkdir
   if (existsSync(lockPath)) {
     try {
       const s = statSync(lockPath);
       if (s.isFile()) {
         const ageMs = Date.now() - s.mtimeMs;
         if (ageMs > ttlMs) {
-          try { await unlink(lockPath); } catch { /* stale lock file already removed */ }
+          try { await unlink(lockPath); } catch {  }
         }
       }
-    } catch { /* stat failed, lock may have been released concurrently */ }
+    } catch {  }
   }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      // mkdir is atomic on POSIX - fails with EEXIST if already held
       await mkdir(lockPath, { recursive: false });
 
       let released = false;
@@ -52,22 +49,21 @@ export async function acquireLock(
         async release() {
           if (released) return;
           released = true;
-          try { await rmdir(lockPath); } catch { /* lock dir already removed */ }
+          try { await rmdir(lockPath); } catch {  }
         },
       };
     } catch (err: any) {
       if (err.code !== "EEXIST") throw err;
 
-      // Check for stale lock
       try {
         const lockStat = await stat(lockPath);
         const ageMs = Date.now() - lockStat.mtimeMs;
         if (ageMs > ttlMs) {
-          try { await rmdir(lockPath); } catch { /* stale lock dir already removed */ }
-          continue; // Retry immediately after stale cleanup
+          try { await rmdir(lockPath); } catch {  }
+          continue;
         }
       } catch {
-        continue; /* lock was released between check and stat */
+        continue;
       }
 
       if (attempt < retries) {
@@ -92,7 +88,7 @@ export async function atomicWrite(path: string, data: object): Promise<void> {
     await writeFile(tmpPath, JSON.stringify(data, null, 2), "utf-8");
     await rename(tmpPath, path);
   } finally {
-    try { await unlink(tmpPath); } catch { /* tmp file already renamed or cleaned */ }
+    try { await unlink(tmpPath); } catch {  }
     await lock.release();
   }
 }
@@ -103,7 +99,7 @@ export async function atomicRead<T = unknown>(path: string): Promise<T | null> {
     if (!(await file.exists())) return null;
     return await file.json() as T;
   } catch {
-    return null; /* file missing, unreadable, or invalid JSON */
+    return null;
   }
 }
 
@@ -123,6 +119,6 @@ export async function cleanTempFiles(dir: string): Promise<number> {
         cleaned++;
       }
     }
-  } catch { /* directory may not exist yet, no temp files to clean */ }
+  } catch {  }
   return cleaned;
 }

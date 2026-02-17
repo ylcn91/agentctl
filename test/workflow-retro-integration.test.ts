@@ -64,17 +64,13 @@ describe("Workflow-Retro Integration", () => {
   test("complete workflow with retro=true triggers retro", async () => {
     const runId = await workflowEngine.triggerWorkflow(twoStepWorkflow, "integration test");
 
-    // Complete step-1
     await workflowEngine.onStepCompleted(runId, "step-1", "accepted", twoStepWorkflow);
 
-    // Complete step-2 — should trigger workflow completion and retro
     await workflowEngine.onStepCompleted(runId, "step-2", "accepted", twoStepWorkflow);
 
-    // Workflow should be in retro_in_progress
     const run = workflowStore.getRun(runId);
     expect(run!.status).toBe("retro_in_progress");
 
-    // A retro session should exist
     const sessions = retroStore.listSessions({ workflowRunId: runId });
     expect(sessions.length).toBe(1);
     expect(sessions[0].status).toBe("collecting");
@@ -90,7 +86,6 @@ describe("Workflow-Retro Integration", () => {
     const sessions = retroStore.listSessions({ workflowRunId: runId });
     const retroId = sessions[0].id;
 
-    // Submit reviews
     retroEngine.submitReview(retroId, {
       author: "alice",
       whatWentWell: ["smooth handoff"],
@@ -110,12 +105,10 @@ describe("Workflow-Retro Integration", () => {
     });
     expect(status.allCollected).toBe(true);
 
-    // Aggregate
     const aggregation = retroEngine.aggregate(retroId);
     expect(aggregation.themes.whatWorked).toContain("smooth handoff");
     expect(aggregation.themes.whatWorked).toContain("clear specs");
 
-    // Synthesize
     const doc: RetroDocument = {
       title: "Integration Test Retro",
       workflowName: "test-workflow",
@@ -133,13 +126,11 @@ describe("Workflow-Retro Integration", () => {
 
     await retroEngine.completeSynthesis(retroId, doc);
 
-    // Verify document is stored
     const stored = retroEngine.getDocument(retroId);
     expect(stored).not.toBeNull();
     expect(stored!.title).toBe("Integration Test Retro");
     expect(stored!.actionableLearnings).toContain("speed up CI");
 
-    // Session should be complete
     const session = retroEngine.getSession(retroId);
     expect(session!.status).toBe("complete");
   });
@@ -186,7 +177,6 @@ describe("Workflow-Retro Integration", () => {
 
     await retroEngine.completeSynthesis(retroId, doc);
 
-    // Knowledge store should contain the retro learnings
     const results = knowledgeStore.search("unit tests", "retro" as any, 5);
     expect(results.length).toBeGreaterThan(0);
     expect(results[0].entry.content).toContain("always write unit tests first");

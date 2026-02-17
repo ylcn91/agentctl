@@ -1,5 +1,3 @@
-// F-10: Non-repudiable Verification Receipts
-// Paper ref: Section 4.7 (Verification & Accountability)
 
 import { createHmac } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
@@ -33,7 +31,6 @@ function getOrCreateSecret(keyPath?: string): string {
   if (existsSync(path)) {
     return readFileSync(path, "utf-8").trim();
   }
-  // Auto-generate key on first use
   const secret = crypto.randomUUID() + "-" + crypto.randomUUID();
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, secret, { mode: 0o600 });
@@ -41,7 +38,6 @@ function getOrCreateSecret(keyPath?: string): string {
 }
 
 function signReceipt(receipt: Omit<VerificationReceipt, "signature">, secret: string): string {
-  // Sort fields alphabetically and sign
   const fields: Record<string, unknown> = {
     delegatee: receipt.delegatee,
     delegator: receipt.delegator,
@@ -97,7 +93,6 @@ export function verifyReceipt(receipt: VerificationReceipt, keyPath?: string): b
   const secret = getOrCreateSecret(keyPath);
   const { signature, ...rest } = receipt;
   const expected = signReceipt(rest, secret);
-  // Constant-time comparison
   if (signature.length !== expected.length) return false;
   let mismatch = 0;
   for (let i = 0; i < signature.length; i++) {

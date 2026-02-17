@@ -1,9 +1,9 @@
 import { atomicWrite, atomicRead } from "./file-store";
 
-export type TaskStatus = "todo" | "in_progress" | "ready_for_review" | "accepted" | "rejected";
+export type TaskStatus = "todo" | "in_progress" | "ready_for_review" | "accepted" | "rejected" | "needs_review";
 export type TaskPriority = "P0" | "P1" | "P2";
 
-export type TaskEventType = "status_changed" | "review_rejected" | "review_accepted" | "cleanup_queued";
+export type TaskEventType = "status_changed" | "review_rejected" | "review_accepted" | "cleanup_queued" | "escalated";
 
 export interface TaskEvent {
   type: TaskEventType;
@@ -30,7 +30,10 @@ export interface Task {
   tags?: string[];
   events: TaskEvent[];
   workspaceContext?: WorkspaceContext;
+  rejectionCount?: number;
 }
+
+export const REJECTION_ESCALATION_THRESHOLD = 3;
 
 export const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   todo: ["in_progress"],
@@ -38,6 +41,7 @@ export const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   ready_for_review: ["accepted", "rejected"],
   accepted: [],
   rejected: [],
+  needs_review: ["in_progress", "accepted"],
 };
 
 export interface TaskBoard {
@@ -124,15 +128,30 @@ export function rejectTask(board: TaskBoard, id: string, reason: string): TaskBo
   }
 
   const now = new Date().toISOString();
+  const newCount = (task.rejectionCount ?? 0) + 1;
+  const escalate = newCount >= REJECTION_ESCALATION_THRESHOLD;
+
   const events: TaskEvent[] = [
     ...task.events,
     { type: "status_changed", timestamp: now, from: "ready_for_review", to: "rejected" },
     { type: "review_rejected", timestamp: now, from: "ready_for_review", to: "rejected", reason },
-    { type: "status_changed", timestamp: now, from: "rejected", to: "in_progress" },
   ];
 
+  if (escalate) {
+    events.push({ type: "escalated", timestamp: now, reason: `Rejected ${newCount} times` });
+    events.push({ type: "status_changed", timestamp: now, from: "rejected", to: "needs_review" });
+    return {
+      tasks: board.tasks.map((t) =>
+        t.id === id ? { ...t, status: "needs_review" as TaskStatus, events, rejectionCount: newCount } : t,
+      ),
+    };
+  }
+
+  events.push({ type: "status_changed", timestamp: now, from: "rejected", to: "in_progress" });
   return {
-    tasks: board.tasks.map((t) => (t.id === id ? { ...t, status: "in_progress" as TaskStatus, events } : t)),
+    tasks: board.tasks.map((t) =>
+      t.id === id ? { ...t, status: "in_progress" as TaskStatus, events, rejectionCount: newCount } : t,
+    ),
   };
 }
 
@@ -186,4 +205,9 @@ export function assignTask(board: TaskBoard, id: string, assignee: string | unde
 
 export function removeTask(board: TaskBoard, id: string): TaskBoard {
   return { tasks: board.tasks.filter((t) => t.id !== id) };
+}
+
+export function getTasksForAccount(board: TaskBoard, account: string): Task[] {
+  const accountTasks = board.tasks.filter((t) => t.assignee === account);
+  return sortByPriority(accountTasks);
 }

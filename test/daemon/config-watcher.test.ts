@@ -52,7 +52,7 @@ describe("ConfigWatcher", () => {
   test("start() is idempotent", () => {
     const watcher = new ConfigWatcher(() => {}, { configPath: CONFIG_PATH });
     watcher.start();
-    watcher.start(); // second call should not throw
+    watcher.start();
     expect(watcher.isWatching()).toBe(true);
     watcher.stop();
   });
@@ -88,7 +88,6 @@ describe("ConfigWatcher", () => {
     await watcher.reload();
     expect(callCount).toBe(1);
 
-    // Modify config
     writeConfig({
       ...DEFAULT_CONFIG,
       accounts: [{ name: "test", configDir: "~/.test", color: "#000", label: "Test", provider: "claude-code" }],
@@ -104,12 +103,9 @@ describe("ConfigWatcher", () => {
     let received: any = null;
     const watcher = new ConfigWatcher((config) => { received = config; }, { configPath: CONFIG_PATH });
 
-    // Write garbage
     writeFileSync(CONFIG_PATH, "not valid json{{{");
 
     const result = await watcher.reload();
-    // loadConfig falls back to defaults on invalid JSON
-    // so this should still work
     expect(result).toBeDefined();
     watcher.stop();
   });
@@ -121,14 +117,10 @@ describe("ConfigWatcher", () => {
     expect(watcher.isWatching()).toBe(false);
   });
 
-  // --- New tests for code review findings ---
-
   test("start() when config file does not exist does not throw", () => {
     const missingPath = join(TEST_DIR, "nonexistent-config.json");
     const watcher = new ConfigWatcher(() => {}, { configPath: missingPath });
-    // Should not throw, just log an error
     expect(() => watcher.start()).not.toThrow();
-    // Watcher should not be watching since file doesn't exist
     expect(watcher.isWatching()).toBe(false);
     watcher.stop();
   });
@@ -137,15 +129,11 @@ describe("ConfigWatcher", () => {
     let received: any = null;
     const watcher = new ConfigWatcher((config) => { received = config; }, { configPath: CONFIG_PATH });
 
-    // Write garbage JSON
     writeFileSync(CONFIG_PATH, "not valid json{{{");
 
     const result = await watcher.reload();
-    // loadConfig falls back to defaults on invalid JSON, so handler should
-    // still be called with a valid config that has default values
     expect(result).not.toBeNull();
     expect(received).not.toBeNull();
-    // Should have default structure
     expect(received.schemaVersion).toBe(1);
     expect(received.accounts).toEqual([]);
     expect(received.entire.autoEnable).toBe(true);

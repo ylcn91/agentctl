@@ -74,7 +74,6 @@ describe("UI Scaling", () => {
       );
       const startIndex = Math.max(0, scrollOffset);
       const endIndex = Math.min(totalAccounts, startIndex + VISIBLE_WINDOW);
-      // With 5 accounts and window of 8, should show all
       expect(startIndex).toBe(0);
       expect(endIndex).toBe(5);
     });
@@ -91,7 +90,6 @@ describe("UI Scaling", () => {
       const aboveCount = startIndex;
       const belowCount = totalAccounts - endIndex;
 
-      // Selected at 7, window center at 4 -> offset = 3
       expect(startIndex).toBe(3);
       expect(endIndex).toBe(11);
       expect(aboveCount).toBe(3);
@@ -140,16 +138,13 @@ describe("UI Scaling", () => {
       const accountsLength = 5;
       let selectedAccount = 0;
 
-      // Move right
       selectedAccount = Math.min(accountsLength - 1, selectedAccount + 1);
       expect(selectedAccount).toBe(1);
 
-      // Move to end
       selectedAccount = accountsLength - 1;
       selectedAccount = Math.min(accountsLength - 1, selectedAccount + 1);
       expect(selectedAccount).toBe(4);
 
-      // Move left from start
       selectedAccount = 0;
       selectedAccount = Math.max(0, selectedAccount - 1);
       expect(selectedAccount).toBe(0);

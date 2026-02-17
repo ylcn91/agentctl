@@ -1,8 +1,6 @@
 import { z } from "zod";
 import { parse as parseYaml } from "yaml";
 
-// ── Types ──
-
 export interface WorkflowDefinition {
   name: string;
   description?: string;
@@ -27,8 +25,6 @@ export interface WorkflowStep {
     blocked_by?: string[];
   };
 }
-
-// ── Zod Schema ──
 
 const HandoffSchema = z.object({
   goal: z.string(),
@@ -57,12 +53,9 @@ const WorkflowSchema = z.object({
   retro: z.boolean().default(false),
 });
 
-// ── DAG Validation ──
-
 export function validateDAG(steps: WorkflowStep[]): void {
   const ids = new Set(steps.map((s) => s.id));
 
-  // Check that all depends_on references exist
   for (const step of steps) {
     for (const dep of step.depends_on ?? []) {
       if (!ids.has(dep)) {
@@ -71,7 +64,6 @@ export function validateDAG(steps: WorkflowStep[]): void {
     }
   }
 
-  // Kahn's algorithm for cycle detection
   const inDegree = new Map<string, number>();
   const adjacency = new Map<string, string[]>();
   for (const step of steps) {
@@ -138,8 +130,6 @@ export function topologicalSort(steps: WorkflowStep[]): string[] {
 
   return order;
 }
-
-// ── Parsing ──
 
 export function parseWorkflow(yamlContent: string): WorkflowDefinition {
   const raw = parseYaml(yamlContent);

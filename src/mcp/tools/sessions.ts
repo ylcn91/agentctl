@@ -39,7 +39,6 @@ export function registerSessionTools(server: McpServer, sendToDaemon: DaemonSend
       data: z.record(z.string(), z.unknown()).describe("Update data to broadcast"),
     },
   }, async (args) => {
-    // Sanitize string values in broadcast data
     const warnings: string[] = [];
     const sanitizedData: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(args.data)) {

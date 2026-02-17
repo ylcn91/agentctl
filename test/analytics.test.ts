@@ -38,7 +38,7 @@ describe("computeAnalytics", () => {
   test("single accepted task computes correct cycle time", () => {
     const createdAt = "2026-01-15T10:00:00.000Z";
     const acceptedAt = "2026-01-15T12:00:00.000Z";
-    const expectedCycleMs = 2 * 60 * 60 * 1000; // 2 hours
+    const expectedCycleMs = 2 * 60 * 60 * 1000;
 
     const task = makeTask({
       status: "accepted",
@@ -96,7 +96,6 @@ describe("computeAnalytics", () => {
   });
 
   test("accept rate handles division by zero", () => {
-    // Task that is neither accepted nor rejected
     const task = makeTask({ assignee: "charlie", status: "in_progress" });
     const snap = computeAnalytics(makeBoard([task]));
 
@@ -117,17 +116,14 @@ describe("computeAnalytics", () => {
       makeTask({ createdAt: "2026-02-05T10:00:00.000Z", assignee: "bob", status: "todo" }),
     ];
 
-    // Only include tasks from Jan 15 onwards
     const snap = computeAnalytics(makeBoard(tasks), { fromDate: "2026-01-15T00:00:00.000Z" });
 
     expect(snap.totalTasks).toBe(2);
     expect(snap.fromDate).toBe("2026-01-15T00:00:00.000Z");
 
-    // Only include tasks before Jan 15
     const snap2 = computeAnalytics(makeBoard(tasks), { toDate: "2026-01-15T00:00:00.000Z" });
     expect(snap2.totalTasks).toBe(1);
 
-    // Both bounds
     const snap3 = computeAnalytics(makeBoard(tasks), {
       fromDate: "2026-01-15T00:00:00.000Z",
       toDate: "2026-01-25T00:00:00.000Z",
@@ -154,7 +150,7 @@ describe("computeAnalytics", () => {
   });
 
   test("unassigned tasks grouped under (unassigned)", () => {
-    const task = makeTask({ status: "todo" }); // no assignee
+    const task = makeTask({ status: "todo" });
     const snap = computeAnalytics(makeBoard([task]));
 
     expect(snap.perAccount).toHaveLength(1);
@@ -171,7 +167,7 @@ describe("formatAnalyticsSummary", () => {
       totalAccepted: 6,
       totalRejected: 2,
       overallAcceptRate: 0.75,
-      avgCycleTimeMs: 7200000, // 2h
+      avgCycleTimeMs: 7200000,
       perAccount: [
         {
           accountName: "alice",

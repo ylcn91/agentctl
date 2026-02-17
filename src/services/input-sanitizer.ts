@@ -1,5 +1,3 @@
-// F-12: Input Sanitization
-// Harden handoff field validation against injection attacks.
 
 export interface SanitizationError {
   field: string;
@@ -13,12 +11,10 @@ export interface SanitizationResult {
   warnings: SanitizationError[];
 }
 
-// Max length limits
 const MAX_GOAL_LENGTH = 10_000;
 const MAX_CRITERIA_ITEM_LENGTH = 2_000;
 const MAX_RUN_COMMAND_LENGTH = 1_000;
 
-// Shell injection patterns for run_commands
 const SHELL_INJECTION_PATTERNS: { pattern: RegExp; description: string }[] = [
   { pattern: /`[^`]+`/, description: "backtick command substitution" },
   { pattern: /\$\(/, description: "$() command substitution" },
@@ -31,8 +27,8 @@ const SHELL_INJECTION_PATTERNS: { pattern: RegExp; description: string }[] = [
   { pattern: /\|\s*zsh\b/, description: "pipe to zsh" },
   { pattern: /\$\(wget\b/, description: "$() with wget" },
   { pattern: /\$\(curl\b/, description: "$() with curl" },
-  { pattern: />\s*\/etc\//, description: "redirect to /etc/" },
-  { pattern: />\s*\/dev\//, description: "redirect to /dev/" },
+  { pattern: />\s*\/etc\
+  { pattern: />\s*\/dev\
   { pattern: /;\s*chmod\s+[0-7]{3,4}\b/, description: "command chaining with chmod" },
   { pattern: /;\s*sudo\b/, description: "command chaining with sudo" },
   { pattern: /;\s*mkfs\b/, description: "command chaining with mkfs" },
@@ -40,16 +36,13 @@ const SHELL_INJECTION_PATTERNS: { pattern: RegExp; description: string }[] = [
   { pattern: />\s*~\/\.\w+/, description: "redirect to hidden dotfile" },
 ];
 
-// Path traversal patterns
 const PATH_TRAVERSAL_PATTERNS: { pattern: RegExp; description: string }[] = [
-  { pattern: /\.\.\//, description: "relative path traversal (../)" },
+  { pattern: /\.\.\
   { pattern: /\.\.\\/, description: "relative path traversal (..\\)" },
   { pattern: /\x00/, description: "null byte in path" },
-  // eslint-disable-next-line no-control-regex
   { pattern: /[\x01-\x1f\x7f]/, description: "control character in path" },
 ];
 
-// System prompt override patterns
 const PROMPT_OVERRIDE_PATTERNS: { pattern: RegExp; description: string }[] = [
   { pattern: /ignore\s+(?:all\s+)?previous\s+instructions/i, description: "prompt override: ignore previous instructions" },
   { pattern: /(?:^|\n)\s*system\s*:/im, description: "prompt override: system: prefix" },
@@ -60,21 +53,12 @@ const PROMPT_OVERRIDE_PATTERNS: { pattern: RegExp; description: string }[] = [
   { pattern: /override\s+(?:system|safety)\s+(?:prompt|instructions|rules)/i, description: "prompt override: override system" },
 ];
 
-// Control characters regex (null bytes, ANSI escapes, C0/C1 control chars except \n, \r, \t)
-// Match ANSI sequences first (longer patterns), then single control chars
 const CONTROL_CHARS_RE = /\x1b\[[0-9;]*[A-Za-z]|\x1b\].*?\x07|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g;
 
-/**
- * Strip control characters and ANSI escape sequences from a string.
- * Preserves newlines (\n), carriage returns (\r), and tabs (\t).
- */
 export function stripControlChars(input: string): string {
   return input.replace(CONTROL_CHARS_RE, "");
 }
 
-/**
- * Check a single run_command for shell injection patterns.
- */
 function checkShellInjection(command: string, index: number): SanitizationError[] {
   const errors: SanitizationError[] = [];
   for (const { pattern, description } of SHELL_INJECTION_PATTERNS) {
@@ -89,9 +73,6 @@ function checkShellInjection(command: string, index: number): SanitizationError[
   return errors;
 }
 
-/**
- * Check a path string for traversal attacks.
- */
 function checkPathTraversal(value: string, field: string): SanitizationError[] {
   const errors: SanitizationError[] = [];
   for (const { pattern, description } of PATH_TRAVERSAL_PATTERNS) {
@@ -106,9 +87,6 @@ function checkPathTraversal(value: string, field: string): SanitizationError[] {
   return errors;
 }
 
-/**
- * Check text for system prompt override attempts.
- */
 function checkPromptOverride(text: string, field: string): SanitizationError[] {
   const warnings: SanitizationError[] = [];
   for (const { pattern, description } of PROMPT_OVERRIDE_PATTERNS) {
@@ -123,13 +101,6 @@ function checkPromptOverride(text: string, field: string): SanitizationError[] {
   return warnings;
 }
 
-/**
- * Sanitize the full handoff payload. Call before validateHandoff().
- *
- * Returns { safe, errors, warnings }:
- * - safe=false if any "block" severity errors found
- * - warnings contain "warn" severity items (prompt override attempts)
- */
 export function sanitizeHandoffPayload(payload: unknown): SanitizationResult {
   const errors: SanitizationError[] = [];
   const warnings: SanitizationError[] = [];
@@ -140,7 +111,6 @@ export function sanitizeHandoffPayload(payload: unknown): SanitizationResult {
 
   const obj = payload as Record<string, unknown>;
 
-  // 1. Max length enforcement
   if (typeof obj.goal === "string" && obj.goal.length > MAX_GOAL_LENGTH) {
     errors.push({
       field: "goal",
@@ -175,7 +145,6 @@ export function sanitizeHandoffPayload(payload: unknown): SanitizationResult {
     }
   }
 
-  // 2. Shell injection detection in run_commands
   if (Array.isArray(obj.run_commands)) {
     for (let i = 0; i < obj.run_commands.length; i++) {
       const cmd = obj.run_commands[i];
@@ -185,7 +154,6 @@ export function sanitizeHandoffPayload(payload: unknown): SanitizationResult {
     }
   }
 
-  // 3. Path traversal detection in context fields
   const ctx = obj.context as Record<string, unknown> | undefined;
   if (ctx && typeof ctx === "object") {
     if (typeof ctx.projectDir === "string") {
@@ -196,9 +164,8 @@ export function sanitizeHandoffPayload(payload: unknown): SanitizationResult {
     }
   }
 
-  // Also check parent_handoff_id for control chars
   if (typeof obj.parent_handoff_id === "string") {
-    // eslint-disable-next-line no-control-regex
+
     if (/[\x00-\x1f\x7f]/.test(obj.parent_handoff_id)) {
       errors.push({
         field: "parent_handoff_id",
@@ -208,7 +175,6 @@ export function sanitizeHandoffPayload(payload: unknown): SanitizationResult {
     }
   }
 
-  // 4. System prompt override detection in text fields
   if (typeof obj.goal === "string") {
     warnings.push(...checkPromptOverride(obj.goal, "goal"));
   }
@@ -222,33 +188,23 @@ export function sanitizeHandoffPayload(payload: unknown): SanitizationResult {
     }
   }
 
-  // 5. Control character stripping is applied in sanitizeStringFields()
-
   const safe = errors.length === 0;
   return { safe, errors, warnings };
 }
 
-/**
- * Lightweight sanitizer for MCP tool text inputs.
- * Strips control characters (keeps newlines/tabs), enforces max length,
- * and warns on suspicious patterns (prompt overrides) without blocking.
- */
 export function sanitizeMCPText(
   text: string,
   maxLength = 10_000,
 ): { safe: boolean; sanitized: string; warnings: string[] } {
   const warnings: string[] = [];
 
-  // Strip control characters (preserve \n, \r, \t)
   let sanitized = stripControlChars(text);
 
-  // Enforce max length
   if (sanitized.length > maxLength) {
     sanitized = sanitized.slice(0, maxLength);
     warnings.push(`Text truncated from ${text.length} to ${maxLength} characters`);
   }
 
-  // Check for prompt override patterns (warn only, don't block)
   for (const { pattern, description } of PROMPT_OVERRIDE_PATTERNS) {
     if (pattern.test(sanitized)) {
       warnings.push(`Suspicious pattern: ${description}`);
@@ -258,108 +214,4 @@ export function sanitizeMCPText(
   return { safe: true, sanitized, warnings };
 }
 
-// Max command length for acceptance runner commands
-const MAX_SHELL_COMMAND_LENGTH = 2_000;
-
-// Dangerous shell metacharacters that indicate command chaining or injection
-const DANGEROUS_SHELL_PATTERNS: { pattern: RegExp; description: string }[] = [
-  { pattern: /`[^`]*`/, description: "backtick command substitution" },
-  { pattern: /\$\(/, description: "$() command substitution" },
-  { pattern: /\$\{/, description: "${} variable expansion" },
-  { pattern: /;/, description: "command chaining with semicolon" },
-  { pattern: /\|/, description: "pipe operator" },
-  { pattern: /&&/, description: "AND chaining (&&)" },
-  { pattern: /\|\|/, description: "OR chaining (||)" },
-  { pattern: />\s*>?/, description: "output redirection" },
-  { pattern: /</, description: "input redirection" },
-  { pattern: /\x00/, description: "null byte" },
-];
-
-/**
- * Validate a shell command for the acceptance runner.
- * Rejects commands with dangerous shell metacharacters using an allowlist approach:
- * only permits simple command patterns (binary + arguments, no chaining/piping/redirection).
- *
- * Returns { safe, command, reason } where:
- * - safe=true if the command passes all checks
- * - safe=false with reason describing why the command was rejected
- */
-export function sanitizeShellCommand(command: string): { safe: boolean; command: string; reason?: string } {
-  // Check for empty/whitespace-only commands
-  if (!command || command.trim().length === 0) {
-    return { safe: false, command, reason: "Empty command" };
-  }
-
-  // Check max length
-  if (command.length > MAX_SHELL_COMMAND_LENGTH) {
-    return { safe: false, command, reason: `Command exceeds maximum length of ${MAX_SHELL_COMMAND_LENGTH} characters (got ${command.length})` };
-  }
-
-  // Check for dangerous shell metacharacters
-  for (const { pattern, description } of DANGEROUS_SHELL_PATTERNS) {
-    if (pattern.test(command)) {
-      return { safe: false, command, reason: `Dangerous shell pattern detected: ${description}` };
-    }
-  }
-
-  // Check for control characters (except normal whitespace)
-  // eslint-disable-next-line no-control-regex
-  if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(command)) {
-    return { safe: false, command, reason: "Command contains control characters" };
-  }
-
-  return { safe: true, command: command.trim() };
-}
-
-/**
- * Sanitize a free-text search query for SQLite FTS5.
- * Splits into terms, escapes double-quotes, filters degenerate inputs,
- * and wraps each term in double-quotes so FTS5 treats them as literals.
- */
-export function sanitizeFTS5Query(query: string): string {
-  const terms = query
-    .split(/\s+/)
-    .filter(Boolean)
-    .map(term => term.replace(/"/g, '""'))
-    .filter(term => {
-      // Guard against degenerate inputs: only-quotes or empty after cleaning
-      const stripped = term.replace(/""/g, "");
-      return stripped.length > 0;
-    })
-    .map(term => `"${term}"`);
-  return terms.join(" ");
-}
-
-/**
- * Strip control characters from all string fields in the payload, mutating it in place.
- * Returns the same object for convenience.
- */
-export function sanitizeStringFields(payload: Record<string, unknown>): Record<string, unknown> {
-  if (typeof payload.goal === "string") {
-    payload.goal = stripControlChars(payload.goal);
-  }
-
-  if (Array.isArray(payload.acceptance_criteria)) {
-    payload.acceptance_criteria = payload.acceptance_criteria.map(
-      (item: unknown) => (typeof item === "string" ? stripControlChars(item) : item)
-    );
-  }
-
-  if (Array.isArray(payload.run_commands)) {
-    payload.run_commands = payload.run_commands.map(
-      (cmd: unknown) => (typeof cmd === "string" ? stripControlChars(cmd) : cmd)
-    );
-  }
-
-  if (Array.isArray(payload.blocked_by)) {
-    payload.blocked_by = payload.blocked_by.map(
-      (b: unknown) => (typeof b === "string" ? stripControlChars(b) : b)
-    );
-  }
-
-  if (typeof payload.parent_handoff_id === "string") {
-    payload.parent_handoff_id = stripControlChars(payload.parent_handoff_id);
-  }
-
-  return payload;
-}
+export { sanitizeShellCommand, sanitizeFTS5Query, sanitizeStringFields } from "./shell-sanitizer.js";

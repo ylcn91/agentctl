@@ -55,7 +55,6 @@ export function parseCheckpointMetadata(raw: any): EntireCheckpoint {
   };
 }
 
-// Primary: read directly from git orphan branch
 export async function readCheckpointsFromGit(repoDir: string): Promise<EntireCheckpoint[]> {
   try {
     const result = await $`git ls-tree --name-only entire/checkpoints/v1`.cwd(repoDir).quiet();
@@ -74,7 +73,7 @@ export async function readCheckpointsFromGit(repoDir: string): Promise<EntireChe
           const metaResult = await $`git show entire/checkpoints/v1:${dir}/${sub}/metadata.json`.cwd(repoDir).quiet();
           const meta = JSON.parse(metaResult.stdout.toString());
           checkpoints.push(parseCheckpointMetadata(meta));
-        } catch { /* skip unreadable checkpoints */ }
+        } catch {  }
       }
     }
 
@@ -84,7 +83,6 @@ export async function readCheckpointsFromGit(repoDir: string): Promise<EntireChe
   }
 }
 
-// Fallback: shell out to entire CLI
 export async function readCheckpointsFromCLI(repoDir: string): Promise<EntireCheckpoint[]> {
   try {
     await $`entire explain --short --no-pager`.cwd(repoDir).quiet();
@@ -94,12 +92,11 @@ export async function readCheckpointsFromCLI(repoDir: string): Promise<EntireChe
   }
 }
 
-// Combined: git primary, CLI fallback
 export async function getEntireCheckpoints(repoDir: string): Promise<EntireCheckpoint[]> {
   try {
     const fromGit = await readCheckpointsFromGit(repoDir);
     if (fromGit.length > 0) return fromGit;
-  } catch { /* fall through */ }
+  } catch {  }
 
   try {
     return await readCheckpointsFromCLI(repoDir);
@@ -117,7 +114,6 @@ export async function resumeCheckpoint(repoDir: string, checkpointId: string): P
   }
 }
 
-// Destructive operations - delegate to CLI with safety checks
 export async function enableEntire(repoDir: string): Promise<{ success: boolean; error?: string }> {
   try {
     const status = await $`git status --porcelain`.cwd(repoDir).quiet();

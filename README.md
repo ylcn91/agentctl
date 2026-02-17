@@ -126,8 +126,8 @@ Run `actl` to open the interactive dashboard.
 
 ### Core
 - **Multi-account management** with isolated config dirs, tokens, and shell aliases
-- **TUI dashboard** with 15+ views (Ink/React)
-- **15 built-in themes** — catppuccin, tokyonight, dracula, gruvbox, nord, solarized, and more
+- **TUI dashboard** with 15+ views (SolidJS/OpenTUI)
+- **35 built-in themes** — catppuccin, tokyonight, dracula, gruvbox, nord, solarized, rosepine, and more
 - **Command palette** (`Ctrl+P`) with fuzzy search across all views and actions
 
 ### Communication & Handoff
@@ -172,7 +172,7 @@ actl bridge --account work    # start MCP bridge for an account
 │                  CLI (actl)                  │
 │          meow parser + command router       │
 ├─────────────────────────────────────────────┤
-│                  TUI (Ink)                  │
+│            TUI (SolidJS / OpenTUI)           │
 │   Dashboard │ Tasks │ Inbox │ SLA │ ...     │
 ├─────────────────────────────────────────────┤
 │               Service Layer                 │
@@ -187,7 +187,7 @@ actl bridge --account work    # start MCP bridge for an account
 
 **Daemon** — Unix domain socket server (`~/.agentctl/hub.sock`) with NDJSON protocol. Handles message routing, task state, workspace management, council orchestration, session sharing, and config hot-reload.
 
-**Built with:** [Bun](https://bun.sh) · [Ink](https://github.com/vadimdemedes/ink) · [meow](https://github.com/sindresorhus/meow) · [MCP SDK](https://github.com/modelcontextprotocol/sdk) · [Zod](https://github.com/colinhacks/zod)
+**Built with:** [Bun](https://bun.sh) · [SolidJS](https://www.solidjs.com) · [OpenTUI](https://opentui.dev) · [meow](https://github.com/sindresorhus/meow) · [MCP SDK](https://github.com/modelcontextprotocol/sdk) · [Zod](https://github.com/colinhacks/zod)
 
 ---
 
@@ -213,7 +213,7 @@ Override base directory with `AGENTCTL_DIR` env var.
 ```bash
 bun install && bun link              # install + register CLI
 bun test                             # run all tests (124 files, 1875 tests)
-bun build --compile src/cli.tsx --outfile dist/actl   # standalone binary
+bun run build                            # standalone binary
 ```
 
 ---

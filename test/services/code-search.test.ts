@@ -22,8 +22,6 @@ describe("Code Search", () => {
   });
 
   test("returns empty results when no accounts configured", async () => {
-    // searchDirectories loads config; with no config it returns empty
-    // In test environment, we test the function signature & return shape
     const result = await searchDirectories("nonexistent_pattern_xyz123");
     expect(result.pattern).toBe("nonexistent_pattern_xyz123");
     expect(result.results).toBeInstanceOf(Array);
@@ -53,10 +51,7 @@ describe("Code Search", () => {
 
 describe("Code Search - flag injection prevention", () => {
   test("pattern starting with dash is not interpreted as flag", async () => {
-    // A pattern like "-e malicious" could be interpreted as a flag without --
-    // After fix, the -- separator should prevent this
     const result = await searchDirectories("-e hello");
-    // Should not throw, should return results (empty or not depending on config)
     expect(result).toHaveProperty("pattern", "-e hello");
     expect(result.results).toBeInstanceOf(Array);
   });
@@ -82,7 +77,6 @@ describe("Code Search - input validation", () => {
   });
 
   test("null-ish pattern returns empty results", async () => {
-    // @ts-ignore - testing runtime behavior with invalid input
     const result = await searchDirectories(undefined);
     expect(result.results).toEqual([]);
   });
@@ -94,7 +88,6 @@ describe("Code Search - input validation", () => {
 
   test("pattern at exactly 1000 chars does not throw", async () => {
     const pattern = "a".repeat(1000);
-    // Should not throw for the length check (may fail for other reasons like no accounts)
     const result = await searchDirectories(pattern);
     expect(result).toHaveProperty("pattern");
   });
@@ -102,9 +95,7 @@ describe("Code Search - input validation", () => {
 
 describe("Code Search - ripgrep handling", () => {
   test("returns valid response shape when ripgrep finds no matches", async () => {
-    // Search for a pattern that is extremely unlikely to exist anywhere
     const result = await searchDirectories("zzz_absolutely_impossible_pattern_9f8a7b6c5d4e3f2a1b_never_exists");
-    // The response should have the correct shape regardless
     expect(result).toHaveProperty("pattern");
     expect(result).toHaveProperty("results");
     expect(result).toHaveProperty("totalMatches");
@@ -119,9 +110,6 @@ describe("Code Search - workspace directories", () => {
     const workspaceDirs = new Map<string, string[]>();
     workspaceDirs.set("test-account", [ACCOUNT_DIR]);
 
-    // The function still loads config for account names, but workspace dirs
-    // override configDir. Since test config may not have "test-account",
-    // we verify that the function signature accepts workspace dirs.
     const result = await searchDirectories("hello", undefined, 100, workspaceDirs);
     expect(result).toHaveProperty("pattern", "hello");
     expect(result.results).toBeInstanceOf(Array);
@@ -129,7 +117,6 @@ describe("Code Search - workspace directories", () => {
   });
 
   test("workspace dirs map is used instead of configDir for matching accounts", async () => {
-    // Create a workspace dir with a known file
     const wsDir = join(TEST_DIR, "workspace");
     mkdirSync(wsDir, { recursive: true });
     writeFileSync(join(wsDir, "target.ts"), 'const unique_ws_marker = "found_in_workspace";\n');
@@ -137,9 +124,7 @@ describe("Code Search - workspace directories", () => {
     const workspaceDirs = new Map<string, string[]>();
     workspaceDirs.set("test-account", [wsDir]);
 
-    // Even if account configDir doesn't have the marker, workspace dir should be searched
     const result = await searchDirectories("unique_ws_marker", undefined, 100, workspaceDirs);
-    // We can't guarantee the "test-account" is in config, so we just verify shape
     expect(result).toHaveProperty("searchedDirs");
     expect(result.searchedDirs).toBeInstanceOf(Array);
   });
@@ -149,7 +134,6 @@ describe("Code Search - workspace directories", () => {
     workspaceDirs.set("test-account", ["/nonexistent/path/that/does/not/exist"]);
 
     const result = await searchDirectories("hello", undefined, 100, workspaceDirs);
-    // Should not include non-existent dirs in searchedDirs
     expect(result.searchedDirs).not.toContain("/nonexistent/path/that/does/not/exist");
   });
 });

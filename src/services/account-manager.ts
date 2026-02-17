@@ -45,7 +45,6 @@ export function validatePurgePath(dirPath: string): void {
   const home = assertHomeDir();
   const hubDir = getHubDir();
 
-  // Reject root, home directory itself, or paths with too few components
   const parts = resolved.split("/").filter(Boolean);
   if (parts.length < 3) {
     throw new Error(
@@ -59,7 +58,6 @@ export function validatePurgePath(dirPath: string): void {
     );
   }
 
-  // Only allow paths strictly under the agentctl base directory (not the root itself)
   if (!resolved.startsWith(hubDir + "/")) {
     throw new Error(
       `Refusing to purge '${resolved}': path is not under the agentctl config directory '${hubDir}'.`
@@ -83,7 +81,6 @@ export async function setupAccount(opts: SetupAccountOptions): Promise<{
   account: AccountConfig;
   tokenPath: string;
 }> {
-  // 0. Validate name and check for duplicates BEFORE any side effects
   validateAccountName(opts.name);
   const config = await loadConfig(opts.configPath);
   if (config.accounts.some((a) => a.name === opts.name)) {
@@ -92,17 +89,14 @@ export async function setupAccount(opts: SetupAccountOptions): Promise<{
 
   const expandedDir = opts.configDir.replace(/^~/, assertHomeDir());
 
-  // 1. Create config directory
   await mkdir(expandedDir, { recursive: true });
 
-  // 2. Generate token
   const tokensDir = getTokensDir();
   await mkdir(tokensDir, { recursive: true });
   const token = generateToken();
   const tokenPath = join(tokensDir, `${opts.name}.token`);
   await writeFile(tokenPath, token, { mode: 0o600 });
 
-  // 3. Symlink plugins/skills/commands from ~/.claude
   const defaultClaudeDir = `${assertHomeDir()}/.claude`;
   const symlinks: Array<[string, string]> = [];
 
@@ -118,10 +112,8 @@ export async function setupAccount(opts: SetupAccountOptions): Promise<{
     }
   }
 
-  // 4. Add MCP config to settings.json
   await setupMCPConfig(expandedDir, opts.name);
 
-  // 5. Add to hub config
   const account: AccountConfig = {
     name: opts.name,
     configDir: opts.configDir,
@@ -168,14 +160,12 @@ export async function rotateToken(
     throw new Error(`Account '${name}' not found`);
   }
 
-  // Generate new token
   const newToken = generateToken();
   const tokensDir = getTokensDir();
   await mkdir(tokensDir, { recursive: true });
   const tokenPath = join(tokensDir, `${name}.token`);
   await writeFile(tokenPath, newToken, { mode: 0o600 });
 
-  // Update settings.json MCP config in account's config dir
   const expandedDir = account.configDir.replace(/^~/, assertHomeDir());
   await setupMCPConfig(expandedDir, name);
 
@@ -193,14 +183,12 @@ export async function teardownAccount(
     throw new Error(`Account '${name}' not found`);
   }
 
-  // Remove token
   const tokensDir = getTokensDir();
   const tokenPath = join(tokensDir, `${name}.token`);
   if (existsSync(tokenPath)) {
     await unlink(tokenPath);
   }
 
-  // Purge: remove the config directory (with safety checks)
   if (opts?.purge) {
     const expandedDir = resolve(account.configDir.replace(/^~/, assertHomeDir()));
     validatePurgePath(expandedDir);
@@ -210,7 +198,6 @@ export async function teardownAccount(
     }
   }
 
-  // Remove from config
   const updated = removeAccount(config, name);
   await saveConfig(updated, opts?.configPath);
 }
@@ -220,9 +207,7 @@ export async function addShellAlias(
   configDir: string
 ): Promise<{ modified: boolean; backupPath: string | null }> {
   const zshrcPath = `${assertHomeDir()}/.zshrc`;
-  // Escape configDir for shell safety:
-  // 1. Escape for double-quote context (alias body is re-parsed at invocation)
-  // 2. Escape for single-quote context (alias definition)
+
   const escapedForDoubleQuotes = configDir
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
@@ -237,12 +222,10 @@ export async function addShellAlias(
     content = await readFile(zshrcPath, "utf-8");
   }
 
-  // Idempotent: don't add if already present
   if (content.includes(marker)) {
     return { modified: false, backupPath: null };
   }
 
-  // Backup before modifying
   const backupPath = `${zshrcPath}.backup.${Date.now()}`;
   if (existsSync(zshrcPath)) {
     await copyFile(zshrcPath, backupPath);

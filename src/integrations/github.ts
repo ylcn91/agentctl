@@ -39,7 +39,7 @@ export async function createIssue(opts: {
   if (opts.labels && opts.labels.length > 0) {
     args.push("--label", opts.labels.join(","));
   }
-  // "--" prevents user-supplied content from being interpreted as flags
+
   args.push("--title", opts.title);
   if (opts.body) {
     args.push("--body", opts.body);

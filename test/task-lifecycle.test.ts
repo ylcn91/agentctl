@@ -15,13 +15,12 @@ function emptyBoard(): TaskBoard {
 function boardWithTask(status: TaskStatus): { board: TaskBoard; id: string } {
   let board = addTask(emptyBoard(), "Test task");
   const id = board.tasks[0].id;
-  // Walk the task to the desired status via valid transitions
   const path: Record<TaskStatus, TaskStatus[]> = {
     todo: [],
     in_progress: ["in_progress"],
     ready_for_review: ["in_progress", "ready_for_review"],
-    accepted: ["in_progress", "ready_for_review"], // will use acceptTask
-    rejected: ["in_progress", "ready_for_review"], // will use rejectTask
+    accepted: ["in_progress", "ready_for_review"],
+    rejected: ["in_progress", "ready_for_review"],
   };
   for (const step of path[status]) {
     board = updateTaskStatus(board, id, step);
@@ -29,7 +28,6 @@ function boardWithTask(status: TaskStatus): { board: TaskBoard; id: string } {
   if (status === "accepted") {
     board = acceptTask(board, id);
   }
-  // Note: rejected auto-reopens to in_progress, so we don't build that here
   return { board, id };
 }
 
@@ -196,7 +194,6 @@ describe("event logging", () => {
 
   test("rejection logs three events: status_changed to rejected, review_rejected, status_changed to in_progress", () => {
     const { board, id } = boardWithTask("ready_for_review");
-    // board already has 2 events from todo→in_progress→ready_for_review
     const prevEventCount = board.tasks[0].events.length;
     const updated = rejectTask(board, id, "Fix bugs");
     const newEvents = updated.tasks[0].events.slice(prevEventCount);

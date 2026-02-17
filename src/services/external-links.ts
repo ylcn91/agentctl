@@ -8,7 +8,7 @@ export interface ExternalLink {
   provider: "github";
   type: "issue" | "pr";
   url: string;
-  externalId: string; // "owner/repo#123"
+  externalId: string;
   taskId: string;
   createdAt: string;
 }
@@ -95,7 +95,6 @@ function rowToLink(row: ExternalLinkRow): ExternalLink {
   };
 }
 
-// ── Module-level convenience API (backwards-compatible) ──
 let _store: ExternalLinkStore | undefined;
 
 function getStore(): ExternalLinkStore {
@@ -119,7 +118,6 @@ export function removeLink(id: string): boolean {
   return getStore().removeLink(id);
 }
 
-/** Reset singleton — for testing */
 export function _resetStore(): void {
   _store?.close();
   _store = undefined;

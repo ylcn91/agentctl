@@ -11,12 +11,10 @@ export function registerSessionHandlers(ctx: HandlerContext): Record<string, Han
         safeWrite(socket, reply(msg, { type: "error", error: "Invalid field: target" }));
         return;
       }
-      // M4: Prevent self-pairing
       if (msg.target === accountName) {
         safeWrite(socket, reply(msg, { type: "error", error: "Cannot create session with yourself" }));
         return;
       }
-      // m5: Validate target account is connected
       if (!state.isConnected(msg.target)) {
         safeWrite(socket, reply(msg, { type: "error", error: "Target account is not connected" }));
         return;
@@ -41,12 +39,10 @@ export function registerSessionHandlers(ctx: HandlerContext): Record<string, Han
         safeWrite(socket, reply(msg, { type: "error", error: "Invalid field: sessionId" }));
         return;
       }
-      // C1: Verify membership before broadcast
       if (!state.sharedSessionManager.isMember(msg.sessionId, accountName)) {
         safeWrite(socket, reply(msg, { type: "error", error: "Not a member of this session" }));
         return;
       }
-      // M6: Use return value from addUpdate to report accurate sent status
       const sent = state.sharedSessionManager.addUpdate(msg.sessionId, accountName, msg.data);
       safeWrite(socket, reply(msg, { type: "result", sent }));
     },
@@ -54,7 +50,6 @@ export function registerSessionHandlers(ctx: HandlerContext): Record<string, Han
     session_status: (socket: Socket, msg: any) => {
       const accountName = getAccountName(socket);
       if (msg.sessionId) {
-        // C1: Verify membership before returning session status
         if (!state.sharedSessionManager.isMember(msg.sessionId, accountName)) {
           safeWrite(socket, reply(msg, { type: "error", error: "Not a member of this session" }));
           return;
@@ -62,7 +57,6 @@ export function registerSessionHandlers(ctx: HandlerContext): Record<string, Han
         const session = state.sharedSessionManager.getSession(msg.sessionId);
         safeWrite(socket, reply(msg, { type: "result", session }));
       } else {
-        // M5: Return all active sessions for the account
         const sessions = state.sharedSessionManager.getActiveSessionsForAccount(accountName);
         safeWrite(socket, reply(msg, { type: "result", session: sessions[0] ?? null, sessions }));
       }
@@ -74,7 +68,6 @@ export function registerSessionHandlers(ctx: HandlerContext): Record<string, Han
         safeWrite(socket, reply(msg, { type: "error", error: "Invalid field: sessionId" }));
         return;
       }
-      // C1: Verify membership before returning history
       if (!state.sharedSessionManager.isMember(msg.sessionId, accountName)) {
         safeWrite(socket, reply(msg, { type: "error", error: "Not a member of this session" }));
         return;
@@ -89,8 +82,6 @@ export function registerSessionHandlers(ctx: HandlerContext): Record<string, Han
         safeWrite(socket, reply(msg, { type: "error", error: "Invalid field: sessionId" }));
         return;
       }
-      // C1: Membership is verified inside endSession
-      // m4: endSession returns boolean - reflect reality in response
       const ended = state.sharedSessionManager.endSession(msg.sessionId, accountName);
       safeWrite(socket, reply(msg, { type: "result", ended }));
     },
@@ -101,7 +92,6 @@ export function registerSessionHandlers(ctx: HandlerContext): Record<string, Han
         safeWrite(socket, reply(msg, { type: "error", error: "Invalid field: sessionId" }));
         return;
       }
-      // C1 + C3: Verify membership before recording ping
       if (!state.sharedSessionManager.isMember(msg.sessionId, accountName)) {
         safeWrite(socket, reply(msg, { type: "error", error: "Not a member of this session" }));
         return;

@@ -35,7 +35,6 @@ export function computeAnalytics(
     return created >= fromMs && created <= toMs;
   });
 
-  // Group by assignee
   const byAssignee = new Map<string, Task[]>();
   for (const task of filtered) {
     const key = task.assignee ?? "(unassigned)";
@@ -93,7 +92,6 @@ export function computeAnalytics(
     });
   }
 
-  // SLA violations: search all events for "sla" in any field
   const slaByAction: Record<string, number> = {};
   let slaTotal = 0;
   for (const task of filtered) {

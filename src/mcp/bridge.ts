@@ -57,7 +57,7 @@ function isDaemonRunning(): boolean {
   if (!existsSync(getDaemonPidPath())) return false;
   try {
     const pid = parseInt(readFileSync(getDaemonPidPath(), "utf-8").trim(), 10);
-    // process.kill with signal 0 checks if process exists without killing it
+
     process.kill(pid, 0);
     return true;
   } catch {
@@ -76,7 +76,6 @@ function canConnectToSocket(sockPath: string): Promise<boolean> {
 export async function ensureDaemonRunning(): Promise<void> {
   if (isDaemonRunning() && existsSync(getDaemonSockPath()) && await canConnectToSocket(getDaemonSockPath())) return;
 
-  // Spawn daemon as a detached background process
   const daemonScript = new URL("../daemon/index.ts", import.meta.url).pathname;
   const child = spawn("bun", [daemonScript], {
     detached: true,
@@ -85,7 +84,6 @@ export async function ensureDaemonRunning(): Promise<void> {
   });
   child.unref();
 
-  // Wait for socket to be connectable (not just file existence)
   const deadline = Date.now() + DAEMON_START_TIMEOUT_MS;
   while (Date.now() < deadline) {
     if (existsSync(getDaemonSockPath()) && await canConnectToSocket(getDaemonSockPath())) return;
@@ -96,22 +94,19 @@ export async function ensureDaemonRunning(): Promise<void> {
 }
 
 export async function startBridge(account: string): Promise<void> {
-  // Auto-start daemon if not running
+
   await ensureDaemonRunning();
 
-  // Reconnection state — declared before initial connect so handlers
-  // can be attached to the very first socket with no auth-window gap.
   let reconnectAttempts = 0;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   let initialAuthDone = false;
 
-  // Mutable sender reference so reconnection can swap in a new socket
   let currentSender: DaemonSender;
   const sendToDaemon: DaemonSender = (msg) => currentSender(msg);
 
   function attachReconnectHandlers(sock: Socket): void {
     sock.on("close", () => {
-      // During initial auth the startup promise handles failures directly
+
       if (!initialAuthDone) return;
 
       if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
@@ -126,7 +121,7 @@ export async function startBridge(account: string): Promise<void> {
         try {
           await ensureDaemonRunning();
           const newSocket = createConnection(getDaemonSockPath());
-          // Attach immediately so no close events are missed
+
           attachReconnectHandlers(newSocket);
           newSocket.once("connect", async () => {
             try {
@@ -159,8 +154,6 @@ export async function startBridge(account: string): Promise<void> {
     });
   }
 
-  // Connect to daemon — attach reconnect handlers before auth so no
-  // close event can slip through the auth window unhandled.
   const daemonSocket = createConnection(getDaemonSockPath());
   currentSender = createDaemonSender(daemonSocket);
   attachReconnectHandlers(daemonSocket);
@@ -184,12 +177,10 @@ export async function startBridge(account: string): Promise<void> {
     daemonSocket.once("error", reject);
   });
 
-  // Clean up reconnection timer on process exit
   process.once("exit", () => {
     if (reconnectTimer) clearTimeout(reconnectTimer);
   });
 
-  // Start MCP server on stdio
   const mcpServer = new McpServer(
     { name: "agentctl", version: "1.0.0" },
     { capabilities: { tools: {} } }

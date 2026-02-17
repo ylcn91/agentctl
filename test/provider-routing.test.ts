@@ -45,7 +45,6 @@ describe("provider fit scoring", () => {
       skills: ["typescript", "refactoring"],
     });
     const result = scoreAccount(cap, ["typescript", "refactoring"]);
-    // Both skills are in claude-code's strengths
     const providerReason = result.reasons.find((r) => r.startsWith("provider fit:"));
     expect(providerReason).toContain("2/2");
     expect(providerReason).toContain("20pts");
@@ -56,7 +55,6 @@ describe("provider fit scoring", () => {
       providerType: "claude-code",
       skills: ["typescript", "python"],
     });
-    // typescript is a claude-code strength, python is not
     const result = scoreAccount(cap, ["typescript", "python"]);
     const providerReason = result.reasons.find((r) => r.startsWith("provider fit:"));
     expect(providerReason).toContain("1/2");
@@ -68,7 +66,6 @@ describe("provider fit scoring", () => {
       providerType: "claude-code",
       skills: ["python", "data-analysis"],
     });
-    // Neither python nor data-analysis are claude-code strengths
     const result = scoreAccount(cap, ["python", "data-analysis"]);
     const providerReason = result.reasons.find((r) => r.startsWith("provider fit:"));
     expect(providerReason).toContain("0/2");
@@ -76,7 +73,7 @@ describe("provider fit scoring", () => {
   });
 
   test("no providerType gives neutral 10 points", () => {
-    const cap = makeCapability(); // no providerType
+    const cap = makeCapability();
     const result = scoreAccount(cap, ["typescript", "testing"]);
     const providerReason = result.reasons.find((r) => r.startsWith("provider fit:"));
     expect(providerReason).toContain("neutral");
@@ -118,7 +115,7 @@ describe("trust score", () => {
   });
 
   test("no trust score gives neutral 5 points", () => {
-    const cap = makeCapability(); // no trustScore
+    const cap = makeCapability();
     const result = scoreAccount(cap, []);
     const trustReason = result.reasons.find((r) => r.startsWith("trust:"));
     expect(trustReason).toContain("neutral");

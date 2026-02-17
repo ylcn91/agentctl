@@ -166,10 +166,8 @@ describe("stats-cache parser edge cases", () => {
       modelUsage: {},
     });
     const stats = await provider.parseStatsFromFile(path, "2026-02-12");
-    // todayActivity is the raw entry, messageCount may be undefined
     expect(stats.todayActivity).not.toBeNull();
     expect(stats.todayActivity?.messageCount).toBeUndefined();
-    // weeklyActivity normalizes with ?? 0
     expect(stats.weeklyActivity[0].messageCount).toBe(0);
   });
 });

@@ -1,17 +1,15 @@
 import { test, expect, describe } from "bun:test";
-import { fuzzyMatch, COMMANDS } from "../src/components/CommandPalette";
-import { NAV_KEYS } from "../src/app";
+import { fuzzyMatch, COMMANDS } from "../src/tui/ui/command-palette";
+import { NAV_KEYS } from "../src/tui/context/keybind";
 
 describe("fuzzyMatch edge cases", () => {
   test("handles unicode characters in query", () => {
     const result = fuzzyMatch("cafe", "cafe\u0301");
-    // "cafe" should match the first 4 chars of "cafe\u0301" (the accent is a combining char)
     expect(result.matches).toBe(true);
   });
 
   test("handles unicode characters in text", () => {
     const result = fuzzyMatch("a", "\u00e4pple");
-    // query "a" won't match "\u00e4" since \u00e4 is 'a-umlaut', different char
     expect(result.matches).toBe(false);
   });
 
@@ -24,7 +22,6 @@ describe("fuzzyMatch edge cases", () => {
   });
 
   test("handles special regex characters in query", () => {
-    // fuzzyMatch does character comparison, not regex, so these should be fine
     const result = fuzzyMatch("(", "function (arg)");
     expect(result.matches).toBe(true);
   });
@@ -59,7 +56,7 @@ describe("fuzzyMatch edge cases", () => {
   test("repeated characters match greedily left-to-right", () => {
     const result = fuzzyMatch("aa", "abac");
     expect(result.matches).toBe(true);
-    expect(result.indices).toEqual([0, 2]); // first 'a' at 0, second 'a' at 2
+    expect(result.indices).toEqual([0, 2]);
   });
 });
 
@@ -113,20 +110,15 @@ describe("NAV_KEYS and COMMANDS alignment", () => {
 
 describe("fuzzy matching ranking", () => {
   test("exact prefix match scores higher (earlier indices) than scattered match", () => {
-    // "da" in "Dashboard" should start at index 0
     const prefixResult = fuzzyMatch("da", "Dashboard");
-    // "da" in "Add Account" should have indices further apart
     const scatteredResult = fuzzyMatch("da", "Add Account");
 
     expect(prefixResult.matches).toBe(true);
     expect(scatteredResult.matches).toBe(true);
 
-    // Prefix match has contiguous indices starting at 0
     expect(prefixResult.indices[0]).toBe(0);
     expect(prefixResult.indices[1]).toBe(1);
 
-    // Scattered match has non-contiguous or later-starting indices
-    // In "Add Account": d is at index 2, a is at index 4
     expect(scatteredResult.indices[0]).toBeGreaterThan(0);
   });
 

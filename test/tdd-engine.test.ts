@@ -77,24 +77,20 @@ describe("TddEngine state machine", () => {
   test("canTransition returns correct values", () => {
     const engine = new TddEngine({ testFile: "dummy.test.ts" });
 
-    // idle -> only red
     expect(engine.canTransition("red")).toBe(true);
     expect(engine.canTransition("green")).toBe(false);
     expect(engine.canTransition("refactor")).toBe(false);
 
     engine.start();
-    // red -> only green
     expect(engine.canTransition("green")).toBe(true);
     expect(engine.canTransition("refactor")).toBe(false);
     expect(engine.canTransition("red")).toBe(false);
 
     engine.transition("green");
-    // green -> only refactor
     expect(engine.canTransition("refactor")).toBe(true);
     expect(engine.canTransition("red")).toBe(false);
 
     engine.transition("refactor");
-    // refactor -> only red
     expect(engine.canTransition("red")).toBe(true);
     expect(engine.canTransition("green")).toBe(false);
 
@@ -118,7 +114,7 @@ describe("TddEngine state machine", () => {
     engine.transition("red");
 
     const state = engine.getState();
-    expect(state.cycles.length).toBe(4); // red, green, refactor, red
+    expect(state.cycles.length).toBe(4);
     expect(state.cycles[0].phase).toBe("red");
     expect(state.cycles[1].phase).toBe("green");
     expect(state.cycles[2].phase).toBe("refactor");
@@ -287,7 +283,6 @@ describe("TddEngine onStateChange callback", () => {
     });
     engine.start();
     engine.stop();
-    // start fires once, stop fires once
     expect(states.length).toBe(2);
     expect(states[1].phase).toBe("idle");
   });

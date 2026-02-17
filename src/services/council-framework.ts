@@ -1,15 +1,20 @@
-// Shared framework for council pipelines (analysis + verification)
-// Extracts the common 3-stage pattern: collect -> peer rank -> chairman synthesize
 
 import type { AccountConfig } from "../types";
+import { throwIfAborted } from "./errors";
 
-// ── Types ──
+export type LLMCaller = (account: string, systemPrompt: string, userPrompt: string, signal?: AbortSignal) => Promise<string>;
 
-export type LLMCaller = (account: string, systemPrompt: string, userPrompt: string) => Promise<string>;
+export type StreamingLLMCaller = (
+  account: string,
+  systemPrompt: string,
+  userPrompt: string,
+  onChunk?: (chunk: import("./stream-normalizer").NormalizedChunk) => void,
+  signal?: AbortSignal,
+) => Promise<string>;
 
 export interface CouncilServiceConfig {
-  members: string[];  // account names from config.accounts
-  chairman: string;   // account name
+  members: string[];
+  chairman: string;
   timeoutMs?: number;
 }
 
@@ -19,13 +24,10 @@ export const DEFAULT_COUNCIL_CONFIG: CouncilServiceConfig = {
   timeoutMs: 120_000,
 };
 
-// ── JSON Parsing ──
-
 export function parseJSONFromLLM(text: string): any {
   try {
     return JSON.parse(text);
   } catch {
-    // Try extracting from markdown fenced blocks
     const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
     if (fenceMatch) {
       try {
@@ -38,27 +40,38 @@ export function parseJSONFromLLM(text: string): any {
   }
 }
 
-// ── Provider Commands ──
-
-interface ProviderCommand {
+export interface ProviderCommand {
   cmd: string[];
   env: Record<string, string>;
   parseOutput: (stdout: string) => string;
+  stdinInput: boolean;
 }
 
-function expandHome(p: string): string {
+export function expandHome(p: string): string {
   return p.startsWith("~/") ? p.replace("~", process.env.HOME ?? "") : p;
 }
 
-export function buildProviderCommand(account: AccountConfig, _prompt: string): ProviderCommand {
+const DEFAULT_CLAUDE_CONFIG_DIR = `${process.env.HOME ?? ""}/.claude`;
+
+export function buildProviderCommand(account: AccountConfig, prompt: string, opts?: { streaming?: boolean; model?: string }): ProviderCommand {
   const baseEnv: Record<string, string> = {};
   const configDir = expandHome(account.configDir);
+  const streaming = opts?.streaming ?? false;
+  const model = opts?.model;
 
   switch (account.provider) {
-    case "claude-code":
+    case "claude-code": {
+      const claudeEnv = configDir === DEFAULT_CLAUDE_CONFIG_DIR
+        ? baseEnv
+        : { ...baseEnv, CLAUDE_CONFIG_DIR: configDir };
+      const cmd = streaming
+        ? ["claude", "-p", "--output-format", "stream-json", "--verbose"]
+        : ["claude", "-p", "--output-format", "json"];
+      if (model) cmd.push("--model", model);
       return {
-        cmd: ["claude", "-p", "--output-format", "json"],
-        env: { ...baseEnv, CLAUDE_CONFIG_DIR: configDir },
+        cmd,
+        env: claudeEnv,
+        stdinInput: true,
         parseOutput: (stdout: string) => {
           try {
             const json = JSON.parse(stdout);
@@ -68,134 +81,82 @@ export function buildProviderCommand(account: AccountConfig, _prompt: string): P
           }
         },
       };
-    case "codex-cli":
+    }
+    case "codex-cli": {
+      const cmd = ["codex", "exec"];
+      if (model) cmd.push("--model", model);
       return {
-        cmd: ["codex", "-q"],
+        cmd,
         env: { ...baseEnv, CODEX_HOME: configDir },
+        stdinInput: true,
         parseOutput: (stdout: string) => stdout,
       };
-    case "opencode":
+    }
+    case "opencode": {
+      const baseCmd = streaming
+        ? ["opencode", "run", "--format", "json", "--thinking"]
+        : ["opencode", "run"];
+      if (model) baseCmd.push("--model", model);
       return {
-        cmd: ["opencode", "run"],
+        cmd: [...baseCmd, "--", prompt],
         env: baseEnv,
+        stdinInput: false,
         parseOutput: (stdout: string) => stdout,
       };
-    case "cursor-agent":
+    }
+    case "cursor-agent": {
+      const cmd = streaming
+        ? ["agent", "-p", "--output-format", "stream-json"]
+        : ["agent", "-p", "--output-format", "json"];
+      if (model) cmd.push("--model", model);
       return {
-        cmd: ["agent"],
+        cmd,
         env: baseEnv,
+        stdinInput: true,
         parseOutput: (stdout: string) => stdout,
       };
-    case "gemini-cli":
+    }
+    case "gemini-cli": {
+      const cmd = ["gemini"];
+      if (model) cmd.push("--model", model);
       return {
-        cmd: ["gemini"],
+        cmd,
         env: baseEnv,
+        stdinInput: true,
         parseOutput: (stdout: string) => stdout,
       };
-    case "openhands":
+    }
+    case "openhands": {
+      const cmd = ["openhands"];
+      if (model) cmd.push("--model", model);
       return {
-        cmd: ["openhands"],
+        cmd,
         env: baseEnv,
+        stdinInput: true,
         parseOutput: (stdout: string) => stdout,
       };
+    }
     default:
       throw new Error(`Unsupported provider: ${account.provider}`);
   }
 }
 
-export const DEFAULT_TIMEOUT_MS = 30_000;
-
-export class LLMTimeoutError extends Error {
-  public readonly account: string;
-  public readonly timeoutMs: number;
-
-  constructor(account: string, timeoutMs: number) {
-    super(`Account ${account} LLM call timed out after ${timeoutMs}ms`);
-    this.name = "LLMTimeoutError";
-    this.account = account;
-    this.timeoutMs = timeoutMs;
-  }
-}
-
-export function createAccountCaller(accounts: AccountConfig[], timeoutMs?: number): LLMCaller {
-  const accountMap = new Map<string, AccountConfig>();
-  for (const acc of accounts) {
-    accountMap.set(acc.name, acc);
-  }
-
-  const effectiveTimeout = timeoutMs ?? DEFAULT_TIMEOUT_MS;
-
-  return async (accountName: string, systemPrompt: string, userPrompt: string): Promise<string> => {
-    const account = accountMap.get(accountName);
-    if (!account) {
-      throw new Error(`Account not found: ${accountName}`);
-    }
-
-    const prompt = `${systemPrompt}\n\n${userPrompt}`;
-    const { cmd, env, parseOutput } = buildProviderCommand(account, prompt);
-
-    // Remove CLAUDECODE to allow spawning nested Claude CLI processes
-    const { CLAUDECODE: _, ...cleanEnv } = process.env;
-    const proc = Bun.spawn(cmd, {
-      stdin: new Response(prompt).body,
-      stdout: "pipe",
-      stderr: "pipe",
-      env: { ...cleanEnv, ...env },
-    });
-
-    let timerId: ReturnType<typeof setTimeout> | undefined;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timerId = setTimeout(() => {
-        proc.kill();
-        reject(new LLMTimeoutError(accountName, effectiveTimeout));
-      }, effectiveTimeout);
-    });
-
-    const resultPromise = (async () => {
-      const stdout = await new Response(proc.stdout).text();
-      const exitCode = await proc.exited;
-
-      if (exitCode !== 0) {
-        const stderr = await new Response(proc.stderr).text();
-        throw new Error(`Account ${accountName} CLI exited with code ${exitCode}: ${stderr.slice(0, 500)}`);
-      }
-
-      return parseOutput(stdout.trim());
-    })();
-
-    try {
-      return await Promise.race([resultPromise, timeoutPromise]);
-    } finally {
-      clearTimeout(timerId);
-    }
-  };
-}
-
-// ── Pipeline Utilities ──
-
 const LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-/**
- * Run LLM calls in parallel across accounts, collecting successful results.
- * Failed calls are silently filtered out (Promise.allSettled pattern).
- */
 export async function collectFromAccounts<T>(
   accounts: string[],
   fn: (account: string) => Promise<T>,
+  signal?: AbortSignal,
 ): Promise<T[]> {
+  throwIfAborted(signal);
   const results = await Promise.allSettled(accounts.map(fn));
   const fulfilled: T[] = [];
   for (const r of results) {
-    if (r.status === "fulfilled") {
-      fulfilled.push(r.value);
-    }
+    if (r.status === "fulfilled") fulfilled.push(r.value);
   }
   return fulfilled;
 }
 
-/**
- * Format items with anonymized labels (A, B, C...) for peer review prompts.
- */
 export function anonymizeForPeerReview(
   items: { fields: Record<string, string | string[]> }[],
   labelPrefix: string,
@@ -210,3 +171,18 @@ export function anonymizeForPeerReview(
     })
     .join("\n\n");
 }
+
+export {
+  createAccountCaller,
+  createStreamingAccountCaller,
+  LLMTimeoutError,
+  DEFAULT_TIMEOUT_MS,
+} from "./council-llm-callers";
+
+export {
+  runCouncilDirect,
+  runCouncilDiscussionDirect,
+  type CouncilDirectEvent,
+  type DirectCouncilOpts,
+  type DirectDiscussionOpts,
+} from "./council-direct";

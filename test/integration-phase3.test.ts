@@ -1,5 +1,3 @@
-// Phase 3 Integration Tests — Safety & Resilience features end-to-end
-// Tests the full daemon lifecycle with all new features wired together
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { createConnection, type Socket } from "net";
@@ -9,8 +7,6 @@ import { startDaemon, stopDaemon } from "../src/daemon/server";
 import { DaemonState } from "../src/daemon/state";
 import { createLineParser, frameSend } from "../src/daemon/framing";
 import type { Server } from "net";
-
-// --- Test helpers ---
 
 const TEST_BASE = join(import.meta.dir, ".test-phase3");
 let testCounter = 0;

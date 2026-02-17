@@ -79,7 +79,6 @@ describe("Enhanced Handoff Templates", () => {
 describe("list_handoff_types consistency", () => {
   test("list_handoff_types returns all built-in types", async () => {
     const templates = await loadTemplates();
-    // Simulate what the MCP tool does (after our fix)
     const types = templates.map((t) => ({
       id: t.id,
       name: t.name,
@@ -104,24 +103,19 @@ describe("list_handoff_types consistency", () => {
     const builtIns = templates.filter((t) => t.id.startsWith("builtin-"));
 
     for (const template of builtIns) {
-      // Every built-in template should have:
       expect(template.id).toBeTruthy();
       expect(template.name).toBeTruthy();
       expect(template.description).toBeTruthy();
 
-      // Payload should have acceptance_criteria
       expect(template.payload.acceptance_criteria).toBeDefined();
       expect(template.payload.acceptance_criteria!.length).toBeGreaterThan(0);
 
-      // Payload should have run_commands
       expect(template.payload.run_commands).toBeDefined();
       expect(template.payload.run_commands!.length).toBeGreaterThan(0);
 
-      // Payload should have blocked_by
       expect(template.payload.blocked_by).toBeDefined();
       expect(template.payload.blocked_by!.length).toBeGreaterThan(0);
 
-      // Timestamps should be set
       expect(template.createdAt).toBeTruthy();
       expect(template.updatedAt).toBeTruthy();
     }
@@ -129,7 +123,6 @@ describe("list_handoff_types consistency", () => {
 
   test("handoff types response includes acceptance_criteria, run_commands, and blocked_by", async () => {
     const templates = await loadTemplates();
-    // Simulate the updated MCP tool response format
     const types = templates.map((t) => ({
       id: t.id,
       name: t.name,
@@ -147,7 +140,6 @@ describe("list_handoff_types consistency", () => {
       expect(type).toHaveProperty("run_commands");
       expect(type).toHaveProperty("blocked_by");
 
-      // Verify arrays
       expect(type.acceptance_criteria).toBeInstanceOf(Array);
       expect(type.run_commands).toBeInstanceOf(Array);
       expect(type.blocked_by).toBeInstanceOf(Array);
@@ -165,7 +157,6 @@ describe("list_handoff_types consistency", () => {
       blocked_by: t.payload.blocked_by ?? ["none"],
     }));
 
-    // Every template should appear in both representations
     for (const template of templates) {
       const typeEntry = types.find((t) => t.id === template.id);
       expect(typeEntry).toBeDefined();

@@ -5,9 +5,6 @@ import { EventBus } from "../src/services/event-bus";
 import { mkdirSync, rmSync } from "fs";
 import { join } from "path";
 
-// We test the handler logic by directly exercising the state objects
-// and verifying the behavior that the handlers rely on.
-
 const TEST_DIR = join(import.meta.dir, ".test-missing-handlers");
 process.env.AGENTCTL_DIR = TEST_DIR;
 

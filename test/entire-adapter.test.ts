@@ -9,7 +9,7 @@ function makeSession(overrides: Partial<EntireSessionState> = {}): EntireSession
   return {
     session_id: "2026-02-14-abc123",
     base_commit: "deadbeef",
-    started_at: new Date(Date.now() - 10 * 60_000).toISOString(), // 10 minutes ago
+    started_at: new Date(Date.now() - 10 * 60_000).toISOString(),
     checkpoint_count: 0,
     phase: "idle",
     agent_type: "Claude Code",
@@ -29,7 +29,6 @@ function makeTokenUsage(overrides: Partial<EntireTokenUsage> = {}): EntireTokenU
   };
 }
 
-/** Poll until predicate returns true, or timeout (default 2s) */
 async function waitFor(predicate: () => boolean, timeoutMs = 2000, intervalMs = 50): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -284,7 +283,6 @@ describe("EntireAdapter", () => {
 
       const checkpoints = emitted.filter((e) => e.type === "CHECKPOINT_REACHED");
       expect(checkpoints.length).toBe(1);
-      // 2 files / 5 expected = 40%
       expect((checkpoints[0] as any).percent).toBe(40);
     });
   });
@@ -310,12 +308,11 @@ describe("EntireAdapter", () => {
           output_tokens: 5_000,
           api_call_count: 8,
         }),
-        started_at: new Date(Date.now() - 10 * 60_000).toISOString(), // 10 min ago
+        started_at: new Date(Date.now() - 10 * 60_000).toISOString(),
       });
       const filePath = join(sessionsDir, "metrics-test.json");
       writeFileSync(filePath, JSON.stringify(session));
 
-      // Start watching loads initial state
       adapter.startWatching();
 
       const metrics = adapter.getSessionMetrics("metrics-test");
@@ -324,9 +321,8 @@ describe("EntireAdapter", () => {
       expect(metrics!.phase).toBe("active");
       expect(metrics!.stepCount).toBe(3);
       expect(metrics!.filesTouched).toEqual(["a.ts", "b.ts", "c.ts"]);
-      expect(metrics!.totalTokens).toBe(17_500); // 10000+500+2000+5000
+      expect(metrics!.totalTokens).toBe(17_500);
       expect(metrics!.tokenBurnRate).toBeGreaterThan(0);
-      // Context saturation: 17500/200000 = 0.0875
       expect(metrics!.contextSaturation).toBeCloseTo(0.0875, 3);
       expect(metrics!.elapsedMinutes).toBeGreaterThan(9);
       expect(metrics!.agentType).toBe("Claude Code");
@@ -347,16 +343,14 @@ describe("EntireAdapter", () => {
             output_tokens: 1000,
           }),
         }),
-        started_at: new Date(Date.now() - 5 * 60_000).toISOString(), // 5 min ago
+        started_at: new Date(Date.now() - 5 * 60_000).toISOString(),
       });
       writeFileSync(join(sessionsDir, "burn-rate-test.json"), JSON.stringify(session));
 
       adapter.startWatching();
       const metrics = adapter.getSessionMetrics("burn-rate-test");
 
-      // Total: 5000+0+0+2000 + 3000+0+0+1000 = 11000
       expect(metrics!.totalTokens).toBe(11_000);
-      // Burn rate: 11000 / ~5 = ~2200/min
       expect(metrics!.tokenBurnRate).toBeGreaterThan(2000);
 
       adapter.stopWatching();
@@ -374,7 +368,6 @@ describe("EntireAdapter", () => {
       adapter.startWatching();
       const metrics = adapter.getSessionMetrics("gemini-test");
 
-      // 100000 / 1_000_000 = 0.1
       expect(metrics!.contextSaturation).toBeCloseTo(0.1, 3);
 
       adapter.stopWatching();
@@ -457,13 +450,11 @@ describe("EntireAdapter", () => {
       mkdirSync(sessionsDir, { recursive: true });
       adapter.startWatching();
 
-      // Write a new session file
       writeFileSync(
         join(sessionsDir, "new-session.json"),
         JSON.stringify(makeSession({ session_id: "new-session", phase: "active" }))
       );
 
-      // fs.watch delivery is async and timing varies under load — poll instead of fixed sleep
       await waitFor(() => emitted.some((e) => e.type === "TASK_STARTED"));
 
       const started = emitted.filter((e) => e.type === "TASK_STARTED");
@@ -476,17 +467,14 @@ describe("EntireAdapter", () => {
     test("detects session update and emits correct events", async () => {
       mkdirSync(sessionsDir, { recursive: true });
 
-      // Write initial session
       const initialSession = makeSession({ session_id: "update-test", phase: "idle" });
       writeFileSync(join(sessionsDir, "update-test.json"), JSON.stringify(initialSession));
 
       adapter.startWatching();
 
-      // Update session to active
       const updatedSession = makeSession({ session_id: "update-test", phase: "active" });
       writeFileSync(join(sessionsDir, "update-test.json"), JSON.stringify(updatedSession));
 
-      // fs.watch delivery is async and timing varies under load — poll instead of fixed sleep
       await waitFor(() => emitted.some((e) => e.type === "TASK_STARTED"));
 
       const started = emitted.filter((e) => e.type === "TASK_STARTED");

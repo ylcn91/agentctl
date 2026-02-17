@@ -7,10 +7,9 @@ export interface WatchdogConfig {
   onUnhealthy: (status: HealthStatus) => void;
 }
 
-/** Default watchdog configuration: 30s poll interval, 512 MB memory ceiling. */
 const DEFAULT_CONFIG: WatchdogConfig = {
-  intervalMs: 30_000,          // 30 seconds between health checks
-  memoryThresholdMb: 512,      // alert when RSS exceeds 512 MB
+  intervalMs: 30_000,
+  memoryThresholdMb: 512,
   onUnhealthy: (status) => {
     console.error("[watchdog] Unhealthy:", JSON.stringify(status));
   },

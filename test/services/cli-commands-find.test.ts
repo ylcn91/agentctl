@@ -98,17 +98,13 @@ describe("findCommand", () => {
   test("matches multiple accounts", async () => {
     writeConfig(ACCOUNTS);
     const result = await findCommand("claude-code", TEST_CONFIG);
-    // Both work and review use claude-code provider
     expect(result).toContain("work");
     expect(result).toContain("review");
   });
 
-  // --- New tests for code review findings ---
-
   test("findCommand with empty string matches all accounts", async () => {
     writeConfig(ACCOUNTS);
     const result = await findCommand("", TEST_CONFIG);
-    // Empty string .includes("") is always true, so all accounts match
     expect(result).toContain("work");
     expect(result).toContain("review");
     expect(result).toContain("codex");
@@ -116,9 +112,7 @@ describe("findCommand", () => {
 
   test("findCommand with regex-like pattern is treated as literal", async () => {
     writeConfig(ACCOUNTS);
-    // ".*" should be treated as a literal string (uses .includes(), not regex)
     const result = await findCommand(".*", TEST_CONFIG);
-    // No account name/label/color/provider contains the literal ".*"
     expect(result).toContain("No accounts matching");
   });
 });

@@ -17,6 +17,7 @@ import { TrustStore } from "./trust-store";
 import { EventBus } from "../services/event-bus";
 import { ProgressTracker } from "../services/progress-tracker";
 import { CircuitBreakerService } from "../services/circuit-breaker";
+import { SubscriptionRegistry } from "./subscription-registry";
 
 export interface Message {
   id?: string;
@@ -45,6 +46,7 @@ export class DaemonState {
   sessionStore?: SessionStore;
   trustStore?: TrustStore;
   circuitBreaker?: CircuitBreakerService;
+  subscriptionRegistry = new SubscriptionRegistry();
   eventBus = new EventBus();
   progressTracker = new ProgressTracker();
   sharedSessionManager = new SharedSessionManager();
@@ -116,7 +118,6 @@ export class DaemonState {
     const path = dbPath ?? getRetroDbPath();
     this.retroStore = new RetroStore(path);
     this.retroEngine = new RetroEngine(this.retroStore, this.activityStore, this.knowledgeStore);
-    // Wire retro engine into workflow engine for auto-trigger on completion
     if (this.workflowEngine) {
       this.workflowEngine.retroEngine = this.retroEngine;
     }

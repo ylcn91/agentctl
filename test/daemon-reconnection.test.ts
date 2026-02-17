@@ -1,12 +1,3 @@
-/**
- * Tests that a client can reconnect to the daemon after socket close.
- *
- * Verifies:
- * - Client can re-authenticate after socket destruction
- * - Daemon state survives client disconnection
- * - Messages sent before disconnect are still accessible after reconnect
- * - Multiple sequential reconnections work
- */
 import { describe, test, expect, afterEach } from "bun:test";
 import { join } from "path";
 import { mkdirSync } from "fs";

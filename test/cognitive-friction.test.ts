@@ -60,9 +60,6 @@ describe("checkCognitiveFriction", () => {
         criticality: "critical",
         reversibility: "reversible",
       });
-      // Rule 1 does not match (reversible), so falls through to rule 2
-      // But rule 1 actually matches critical + reversible? No, it requires irreversible/partial.
-      // So rule 2 matches: critical alone => warning
       expect(result.requiresHumanReview).toBe(true);
       expect(result.frictionLevel).toBe("warning");
       expect(result.reason).toContain("Critical task");

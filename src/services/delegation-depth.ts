@@ -1,5 +1,3 @@
-// F-13: Delegation Depth Limits
-// Enforce maximum delegation depth to prevent accountability vacuums.
 
 import type { HandoffPayload } from "./handoff";
 
@@ -20,13 +18,6 @@ export interface DelegationDepthCheck {
   reason?: string;
 }
 
-/**
- * Check whether a handoff payload's delegation_depth is within allowed limits.
- *
- * - If delegation_depth >= maxDepth: blocked, requires human re-authorization
- * - If delegation_depth >= maxDepth - 1: allowed but warns (approaching limit)
- * - If parent_handoff_id provided but no delegation_depth: treats depth as 0
- */
 export function checkDelegationDepth(
   payload: HandoffPayload,
   config?: Partial<DelegationDepthConfig>,
@@ -62,10 +53,6 @@ export function checkDelegationDepth(
   };
 }
 
-/**
- * Compute the next delegation depth based on parent handoff.
- * If a parent_handoff_id is referenced and a parentDepth is known, returns parentDepth + 1.
- */
 export function computeNextDepth(parentDepth?: number): number {
   return (parentDepth ?? 0) + 1;
 }

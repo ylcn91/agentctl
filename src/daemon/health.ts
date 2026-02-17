@@ -5,7 +5,7 @@ import { createLineParser, frameSend } from "./framing";
 
 export interface HealthStatus {
   pid: number;
-  uptime: number;          // milliseconds
+  uptime: number;
   startedAt: string;
   connectedAccounts: number;
   messageStoreOk: boolean;
@@ -27,13 +27,12 @@ export function getHealthStatus(state: DaemonState, startedAt: string): HealthSt
     startedAt,
     connectedAccounts: state.getConnectedAccounts().length,
     messageStoreOk,
-    socketResponsive: true,  // caller overrides if needed
+    socketResponsive: true,
     memoryUsageMb: Math.round((process.memoryUsage().heapUsed / 1024 / 1024) * 100) / 100,
   };
 }
 
 export function selfTest(sockPath: string): Promise<boolean> {
-  // Pre-check: if socket file doesn't exist, skip connection attempt
   if (!existsSync(sockPath)) {
     return Promise.resolve(false);
   }
@@ -66,7 +65,6 @@ export function selfTest(sockPath: string): Promise<boolean> {
     });
 
     socket.on("connect", () => {
-      // Ping is allowed without auth (daemon permits it for health checks)
       socket.write(frameSend({ type: "ping", requestId: "healthcheck" }));
     });
 

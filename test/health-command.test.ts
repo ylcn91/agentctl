@@ -1,4 +1,6 @@
-import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, mock, beforeEach, afterEach, afterAll } from "bun:test";
+
+afterAll(() => { mock.restore(); });
 import { join } from "path";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import type { AccountHealth } from "../src/daemon/health-monitor";
@@ -47,7 +49,6 @@ describe("healthCommand", () => {
     const { healthCommand } = await import("../src/services/cli-commands");
     const output = await healthCommand();
 
-    // Should still work and show account info from local HealthMonitor
     expect(output).toContain("alice");
   });
 
@@ -89,7 +90,6 @@ describe("healthCommand", () => {
       { name: "alice", configDir: TEST_DIR, color: "#89b4fa", label: "Alice", provider: "claude-code" },
     ]);
 
-    // Create a fake socket file so existsSync(getSockPath()) returns true
     const sockPath = join(TEST_DIR, "hub.sock");
     writeFileSync(sockPath, "");
 
@@ -106,7 +106,6 @@ describe("healthCommand", () => {
       },
     ];
 
-    // Mock the health-loader module to return canned daemon data
     mock.module("../src/services/health-loader", () => ({
       fetchHealthStatus: async () => daemonStatuses,
     }));
@@ -124,11 +123,9 @@ describe("healthCommand", () => {
       { name: "bob", configDir: TEST_DIR, color: "#a6e3a1", label: "Bob", provider: "claude-code" },
     ]);
 
-    // Create a fake socket file
     const sockPath = join(TEST_DIR, "hub.sock");
     writeFileSync(sockPath, "");
 
-    // Mock fetchHealthStatus to return empty (daemon has no data)
     mock.module("../src/services/health-loader", () => ({
       fetchHealthStatus: async () => [],
     }));
@@ -136,7 +133,6 @@ describe("healthCommand", () => {
     const { healthCommand } = await import("../src/services/cli-commands");
     const output = await healthCommand();
 
-    // Should fall through to local HealthMonitor and still show the account
     expect(output).toContain("bob");
   });
 });

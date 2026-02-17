@@ -95,3 +95,15 @@ export function getReceiptKeyPath(): string {
 export function getTuiStatePath(): string {
   return `${getHubDir()}/tui-state.json`;
 }
+
+export function getChatSessionsDir(): string {
+  return `${getHubDir()}/chat-sessions`;
+}
+
+export function getChatSessionPath(id: string): string {
+  return `${getChatSessionsDir()}/${id}.json`;
+}
+
+export function getEventLogPath(): string {
+  return `${getHubDir()}/events.ndjson`;
+}

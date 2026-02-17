@@ -515,4 +515,43 @@ describe("CircuitBreakerService", () => {
       expect(cb.getQuarantineRecord("unknown")).toBeNull();
     });
   });
+
+  describe("circuit breaker events", () => {
+    test("emits CIRCUIT_BREAKER_OPEN on quarantine", async () => {
+      deps.loadTasksFn = async () => makeBoard([
+        { id: "t1", assignee: "agent-a", status: "in_progress" },
+      ]);
+      deps.saveTasksFn = async () => {};
+      cb = new CircuitBreakerService(deps);
+
+      await cb.quarantineAgent("agent-a", "test reason", "consecutive_failures");
+
+      const events = deps.eventBus.getRecent({ type: "CIRCUIT_BREAKER_OPEN" });
+      expect(events).toHaveLength(1);
+      const ev = events[0] as any;
+      expect(ev.agent).toBe("agent-a");
+      expect(ev.trigger).toBe("consecutive_failures");
+      expect(ev.reason).toBe("test reason");
+      expect(ev.revokedTaskIds).toContain("t1");
+    });
+
+    test("emits CIRCUIT_BREAKER_CLOSED on reinstate", async () => {
+      deps.loadTasksFn = async () => makeBoard([]);
+      deps.saveTasksFn = async () => {};
+      cb = new CircuitBreakerService(deps);
+
+      await cb.quarantineAgent("agent-a", "test", "trust_drop");
+      cb.reinstateAgent("agent-a");
+
+      const events = deps.eventBus.getRecent({ type: "CIRCUIT_BREAKER_CLOSED" });
+      expect(events).toHaveLength(1);
+      expect((events[0] as any).agent).toBe("agent-a");
+    });
+
+    test("does not emit CIRCUIT_BREAKER_CLOSED when not quarantined", () => {
+      cb.reinstateAgent("agent-a");
+      const events = deps.eventBus.getRecent({ type: "CIRCUIT_BREAKER_CLOSED" });
+      expect(events).toHaveLength(0);
+    });
+  });
 });

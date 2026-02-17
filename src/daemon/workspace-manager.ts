@@ -12,8 +12,6 @@ export type GitExecutor = (
   cwd?: string
 ) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
 
-// Bun.spawn is safe from shell injection (like execFile, not exec).
-// It passes args as an array without a shell.
 export const defaultGitExecutor: GitExecutor = async (args, cwd) => {
   const proc = Bun.spawn(["git", ...args], {
     cwd,

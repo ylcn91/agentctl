@@ -8,6 +8,9 @@ import {
   updateTaskStatus,
   assignTask,
   removeTask,
+  rejectTask,
+  submitForReview,
+  REJECTION_ESCALATION_THRESHOLD,
 } from "../src/services/tasks";
 
 const TEST_DIR = join(import.meta.dir, ".test-tasks");
@@ -106,5 +109,70 @@ describe("tasks service", () => {
     await saveTasks(board, TEST_TASKS_PATH);
     const loaded = await loadTasks(TEST_TASKS_PATH);
     expect(loaded.tasks[0].createdAt).toBe(board.tasks[0].createdAt);
+  });
+
+  test("rejectTask increments rejectionCount", async () => {
+    let board = await loadTasks(TEST_TASKS_PATH);
+    board = addTask(board, "Rejectable task");
+    const id = board.tasks[0].id;
+    board = updateTaskStatus(board, id, "in_progress");
+    board = submitForReview(board, id);
+    board = rejectTask(board, id, "needs work");
+    expect(board.tasks[0].rejectionCount).toBe(1);
+    expect(board.tasks[0].status).toBe("in_progress");
+  });
+
+  test("rejectTask escalates to needs_review after threshold", async () => {
+    let board = await loadTasks(TEST_TASKS_PATH);
+    board = addTask(board, "Escalatable task");
+    const id = board.tasks[0].id;
+
+    board = updateTaskStatus(board, id, "in_progress");
+    for (let i = 0; i < REJECTION_ESCALATION_THRESHOLD; i++) {
+      board = submitForReview(board, id);
+      board = rejectTask(board, id, `rejection ${i + 1}`);
+    }
+
+    expect(board.tasks[0].rejectionCount).toBe(REJECTION_ESCALATION_THRESHOLD);
+    expect(board.tasks[0].status).toBe("needs_review");
+    // Verify escalation event was recorded
+    const escalatedEvent = board.tasks[0].events.find((e) => e.type === "escalated");
+    expect(escalatedEvent).toBeDefined();
+    expect(escalatedEvent!.reason).toContain(`Rejected ${REJECTION_ESCALATION_THRESHOLD} times`);
+  });
+
+  test("rejectTask bounces to in_progress before threshold", async () => {
+    let board = await loadTasks(TEST_TASKS_PATH);
+    board = addTask(board, "Pre-threshold task");
+    const id = board.tasks[0].id;
+
+    board = updateTaskStatus(board, id, "in_progress");
+    board = submitForReview(board, id);
+    board = rejectTask(board, id, "first rejection");
+    expect(board.tasks[0].status).toBe("in_progress");
+    expect(board.tasks[0].rejectionCount).toBe(1);
+
+    board = submitForReview(board, id);
+    board = rejectTask(board, id, "second rejection");
+    expect(board.tasks[0].status).toBe("in_progress");
+    expect(board.tasks[0].rejectionCount).toBe(2);
+  });
+
+  test("needs_review can transition to in_progress or accepted", async () => {
+    let board = await loadTasks(TEST_TASKS_PATH);
+    board = addTask(board, "Needs review task");
+    const id = board.tasks[0].id;
+
+    // Fast-track to needs_review
+    board = updateTaskStatus(board, id, "in_progress");
+    for (let i = 0; i < REJECTION_ESCALATION_THRESHOLD; i++) {
+      board = submitForReview(board, id);
+      board = rejectTask(board, id, `rejection ${i + 1}`);
+    }
+    expect(board.tasks[0].status).toBe("needs_review");
+
+    // Can transition back to in_progress
+    board = updateTaskStatus(board, id, "in_progress");
+    expect(board.tasks[0].status).toBe("in_progress");
   });
 });

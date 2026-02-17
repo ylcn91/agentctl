@@ -1,8 +1,5 @@
 import { describe, test, expect } from "bun:test";
 
-// Test the health-loader service.
-// When no daemon is running (no socket file), fetchHealthStatus returns [].
-
 describe("health-loader", () => {
   test("returns empty array when no daemon socket exists", async () => {
     const orig = process.env.AGENTCTL_DIR;

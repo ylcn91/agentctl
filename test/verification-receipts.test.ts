@@ -19,7 +19,7 @@ describe("computeSpecHash", () => {
 
   test("handles string input", () => {
     const hash = computeSpecHash("raw string payload");
-    expect(hash).toHaveLength(64); // SHA-256 hex length
+    expect(hash).toHaveLength(64);
   });
 
   test("hash is valid hex string", () => {
@@ -54,7 +54,7 @@ describe("createReceipt", () => {
 
     expect(receipt.receiptId).toBeDefined();
     expect(receipt.taskId).toBe("task-1");
-    expect(receipt.handoffId).toBe("task-1"); // defaults to taskId when not provided
+    expect(receipt.handoffId).toBe("task-1");
     expect(receipt.delegator).toBe("alice");
     expect(receipt.delegatee).toBe("bob");
     expect(receipt.specHash).toHaveLength(64);
@@ -63,7 +63,7 @@ describe("createReceipt", () => {
     expect(receipt.verificationMethod).toBe("human-review");
     expect(receipt.timestamp).toBeDefined();
     expect(receipt.signature).toBeDefined();
-    expect(receipt.signature).toHaveLength(64); // HMAC-SHA256 hex
+    expect(receipt.signature).toHaveLength(64);
   });
 
   test("creates receipt with auto-acceptance method and auto-test verificationMethod", () => {
@@ -127,7 +127,6 @@ describe("createReceipt", () => {
   });
 
   test("auto-generates key on first use", () => {
-    // Key path does not exist yet
     const receipt = createReceipt({
       taskId: "task-5",
       delegator: "alice",
@@ -139,7 +138,6 @@ describe("createReceipt", () => {
     });
 
     expect(receipt.signature).toBeDefined();
-    // Key file should now exist
     const keyContent = require("fs").readFileSync(keyPath, "utf-8").trim();
     expect(keyContent.length).toBeGreaterThan(0);
   });
@@ -167,7 +165,6 @@ describe("createReceipt", () => {
       keyPath,
     });
 
-    // Different receipts (different receiptId/timestamp) should have different signatures
     expect(receipt1.signature).not.toBe(receipt2.signature);
   });
 
@@ -294,7 +291,6 @@ describe("verifyReceipt", () => {
       keyPath,
     });
 
-    // Create a different key path
     const otherKeyPath = join(tmpDir, "other.key");
     writeFileSync(otherKeyPath, "different-secret");
     expect(verifyReceipt(receipt, otherKeyPath)).toBe(false);
@@ -314,11 +310,7 @@ describe("verifyReceipt", () => {
 
     expect(verifyReceipt(receipt, keyPath)).toBe(true);
 
-    // Tamper with artifacts
     const tampered = { ...receipt, artifacts: ["file3.ts"] };
-    // Artifacts are not in signed fields in current impl, so this tests consistency
-    // The signature does not include artifacts unless present, so tampering should not matter
-    // unless we explicitly add artifacts to the signed fields
   });
 
   test("rejects receipt with different-length signature", () => {

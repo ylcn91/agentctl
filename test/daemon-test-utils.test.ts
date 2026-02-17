@@ -83,7 +83,6 @@ describe("daemon-test-utils", () => {
     });
     await waitForSocket(daemon.sockPath);
 
-    // Create token after daemon started
     createTestToken(daemon.testDir, "frank", "frank-secret");
 
     const socket = await connectAndAuth(daemon.sockPath, "frank", "frank-secret");

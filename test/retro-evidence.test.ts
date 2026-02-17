@@ -3,7 +3,6 @@ import { RetroEngine } from "../src/services/retro-engine";
 import type { EntireAdapter, EntireSessionMetrics } from "../src/services/entire-adapter";
 import type { RetroStore, RetroSession } from "../src/services/retro-store";
 
-// Mock RetroStore
 function createMockStore(): RetroStore {
   const sessions = new Map<string, RetroSession>();
   const reviews = new Map<string, any[]>();
@@ -35,7 +34,6 @@ function createMockStore(): RetroStore {
   } as unknown as RetroStore;
 }
 
-// Mock EntireAdapter
 function createMockAdapter(metricsMap: Map<string, EntireSessionMetrics>): EntireAdapter {
   return {
     getSessionMetrics: (sessionId: string) => metricsMap.get(sessionId) ?? null,
@@ -77,7 +75,6 @@ describe("retro-evidence (entire.io)", () => {
     test("returns empty when no adapter is provided", () => {
       const engine = new RetroEngine(store, activityStore, undefined, {
         entireMonitoringEnabled: true,
-        // no adapter
       });
 
       const participantMap = new Map([["alice", "session-1"]]);
@@ -157,7 +154,6 @@ describe("retro-evidence (entire.io)", () => {
         elapsedMinutes: 20,
         agentType: "Claude Code",
       });
-      // No metrics for "session-bob"
 
       const adapter = createMockAdapter(metricsMap);
       const engine = new RetroEngine(store, activityStore, undefined, {

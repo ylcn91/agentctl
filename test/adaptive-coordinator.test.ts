@@ -12,7 +12,7 @@ function makeTask(overrides: Partial<TaskState> = {}): TaskState {
     status: "in_progress",
     assignee: "agent-a",
     reassignmentCount: 0,
-    startedAt: new Date(Date.now() - 45 * 60_000).toISOString(), // 45 min ago
+    startedAt: new Date(Date.now() - 45 * 60_000).toISOString(),
     ...overrides,
   };
 }
@@ -79,7 +79,6 @@ describe("AdaptiveCoordinator", () => {
         startedAt: minutesAgo(120, now).toISOString(),
       });
       const actions = coordinator.evaluate([task], now);
-      // Only consecutive rejection actions could appear, but there are none
       expect(actions.filter((a) => a.action === "ping")).toHaveLength(0);
     });
   });
@@ -138,7 +137,6 @@ describe("AdaptiveCoordinator", () => {
       const esc = escalations[0] as Extract<ResponseAction, { action: "escalate_human" }>;
       expect(esc.taskId).toBe("task-1");
 
-      // Should not auto_reassign
       const autoReassigns = actions.filter((a) => a.action === "auto_reassign");
       expect(autoReassigns).toHaveLength(0);
     });
@@ -151,22 +149,18 @@ describe("AdaptiveCoordinator", () => {
 
     test("canReassign returns false within cooldown period", () => {
       coordinator.recordReassignment("task-1");
-      // Immediately after reassignment — should be in cooldown
       expect(coordinator.canReassign("task-1")).toBe(false);
     });
 
     test("canReassign returns true after cooldown period", () => {
       coordinator.recordReassignment("task-1");
-      // 11 minutes later
       const later = new Date(Date.now() + 11 * 60_000);
       expect(coordinator.canReassign("task-1", later)).toBe(true);
     });
 
     test("critical task not auto-reassigned during cooldown", () => {
-      // First, record a recent reassignment
-      const recentReassignment = new Date(now.getTime() - 5 * 60_000); // 5 min ago
+      const recentReassignment = new Date(now.getTime() - 5 * 60_000);
       coordinator = new AdaptiveCoordinator();
-      // Manually set the last reassignment timestamp
       (coordinator as any).lastReassignment.set("task-1", recentReassignment.getTime());
 
       const task = makeTask({
@@ -177,7 +171,6 @@ describe("AdaptiveCoordinator", () => {
       const autoReassigns = actions.filter((a) => a.action === "auto_reassign");
       expect(autoReassigns).toHaveLength(0);
 
-      // Should fall through to suggest_reassign instead
       const suggests = actions.filter((a) => a.action === "suggest_reassign");
       expect(suggests).toHaveLength(1);
     });
@@ -189,7 +182,7 @@ describe("AdaptiveCoordinator", () => {
         startedAt: minutesAgo(35, now).toISOString(),
         lastProgressReport: {
           percent: 40,
-          timestamp: minutesAgo(15, now).toISOString(), // 15 min ago, threshold is 10
+          timestamp: minutesAgo(15, now).toISOString(),
         },
       });
       const actions = coordinator.evaluate([task], now);
@@ -204,7 +197,7 @@ describe("AdaptiveCoordinator", () => {
         startedAt: minutesAgo(35, now).toISOString(),
         lastProgressReport: {
           percent: 40,
-          timestamp: minutesAgo(5, now).toISOString(), // 5 min ago, threshold is 10
+          timestamp: minutesAgo(5, now).toISOString(),
         },
       });
       const actions = coordinator.evaluate([task], now);
@@ -219,7 +212,7 @@ describe("AdaptiveCoordinator", () => {
         startedAt: minutesAgo(50, now).toISOString(),
         estimatedDurationMinutes: 60,
         lastProgressReport: {
-          percent: 30, // Expected ~83%, way behind
+          percent: 30,
           timestamp: minutesAgo(1, now).toISOString(),
         },
       });
@@ -236,7 +229,7 @@ describe("AdaptiveCoordinator", () => {
         startedAt: minutesAgo(30, now).toISOString(),
         estimatedDurationMinutes: 60,
         lastProgressReport: {
-          percent: 50, // Expected ~50%, on track
+          percent: 50,
           timestamp: minutesAgo(1, now).toISOString(),
         },
       });
@@ -264,7 +257,7 @@ describe("AdaptiveCoordinator", () => {
       const rejections = new Map<string, number>();
       rejections.set("agent-b", 2);
       const task = makeTask({
-        status: "todo", // doesn't need to be in_progress for rejection check
+        status: "todo",
         consecutiveRejectionsBy: rejections,
       });
       const actions = coordinator.evaluate([task], now);
@@ -308,19 +301,16 @@ describe("AdaptiveCoordinator", () => {
       ];
       const actions = coordinator.evaluate(tasks, now);
 
-      // task-1: ping (35 min)
       const pings = actions.filter(
         (a) => a.action === "ping" && (a as any).taskId === "task-1",
       );
       expect(pings).toHaveLength(1);
 
-      // task-2: suggest_reassign (65 min)
       const suggests = actions.filter(
         (a) => a.action === "suggest_reassign" && (a as any).taskId === "task-2",
       );
       expect(suggests).toHaveLength(1);
 
-      // task-3: nothing (10 min)
       const task3Actions = actions.filter(
         (a) => "taskId" in a && (a as any).taskId === "task-3",
       );

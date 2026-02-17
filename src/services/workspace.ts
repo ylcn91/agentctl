@@ -52,7 +52,6 @@ export interface ValidationResult {
 
 const MAX_BRANCH_LENGTH = 200;
 
-/** Validates a git branch name, rejecting path traversal and unsafe patterns. */
 export function isValidBranch(branch: string): boolean {
   if (!branch || branch.length > MAX_BRANCH_LENGTH) return false;
   if (branch.startsWith("/") || branch.startsWith("-")) return false;
@@ -94,8 +93,7 @@ export function isActiveStatus(status: WorkspaceStatus): boolean {
 }
 
 export function computeWorktreePath(repoPath: string, branch: string): string {
-  const safeBranch = branch.replace(/\//g, "-");
-  // Resolve repoPath through symlinks to prevent symlink-based path traversal
+  const safeBranch = branch.replace(/[^a-zA-Z0-9._-]/g, "-");
   const realRepoPath = existsSync(repoPath) ? realpathSync(repoPath) : repoPath;
   if (existsSync(repoPath) && repoPath !== realRepoPath) {
     const stat = lstatSync(repoPath);

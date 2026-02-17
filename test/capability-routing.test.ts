@@ -16,8 +16,8 @@ function makeCapability(overrides: Partial<AccountCapability> = {}): AccountCapa
     totalTasks: 10,
     acceptedTasks: 9,
     rejectedTasks: 1,
-    avgDeliveryMs: 180_000, // 3 min
-    lastActiveAt: new Date().toISOString(), // just now
+    avgDeliveryMs: 180_000,
+    lastActiveAt: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -56,7 +56,6 @@ describe("scoreAccount", () => {
     const result = scoreAccount(cap, []);
     const successReason = result.reasons.find((r) => r.startsWith("success rate:"));
     expect(successReason).toContain("95%");
-    // 95% of 20 = 19
     expect(successReason).toContain("19pts");
   });
 
@@ -69,14 +68,14 @@ describe("scoreAccount", () => {
   });
 
   test("fast delivery gives 15 speed points", () => {
-    const cap = makeCapability({ avgDeliveryMs: 120_000 }); // 2 min
+    const cap = makeCapability({ avgDeliveryMs: 120_000 });
     const result = scoreAccount(cap, []);
     const speedReason = result.reasons.find((r) => r.startsWith("speed:"));
     expect(speedReason).toContain("15pts");
   });
 
   test("slow delivery gives low speed points", () => {
-    const cap = makeCapability({ avgDeliveryMs: 3_600_000 }); // 60 min
+    const cap = makeCapability({ avgDeliveryMs: 3_600_000 });
     const result = scoreAccount(cap, []);
     const speedReason = result.reasons.find((r) => r.startsWith("speed:"));
     expect(speedReason).toContain("3pts");
@@ -182,11 +181,10 @@ describe("CapabilityStore", () => {
         totalTasks: 4,
         acceptedTasks: 4,
         rejectedTasks: 0,
-        avgDeliveryMs: 200_000, // 200s avg over 4 tasks
+        avgDeliveryMs: 200_000,
       })
     );
 
-    // New task takes 100_000ms. New avg = (200_000*4 + 100_000) / 5 = 180_000
     store.recordTaskCompletion("bob", true, 100_000);
 
     const updated = store.get("bob")!;

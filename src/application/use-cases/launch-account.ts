@@ -40,7 +40,6 @@ export async function launchAccount(
   const configDir = accountConfig.configDir.replace(/^~/, assertHomeDir());
   const status = opts.onStatus ?? (() => {});
 
-  // Resume from checkpoint
   if (opts.checkpointId) {
     status(`Resuming from checkpoint ${opts.checkpointId.slice(0, 8)}...`);
     const result = await resumeCheckpoint(resolvedDir, opts.checkpointId);
@@ -49,7 +48,6 @@ export async function launchAccount(
     }
   }
 
-  // Auto-enable Entire
   if (!opts.noEntire && config.entire.autoEnable) {
     const installed = await isEntireInstalled();
     if (installed) {
@@ -61,7 +59,6 @@ export async function launchAccount(
     }
   }
 
-  // Build launch command
   const account: Account = { name: accountConfig.name, configDir, provider: accountConfig.provider };
   const provider = registry.getOrDefault(accountConfig.provider);
   const cmd = provider.buildLaunchCommand(account, {
@@ -77,7 +74,6 @@ export async function launchAccount(
     return { success: true, shellCmd };
   }
 
-  // Launch in terminal — prefer explicit terminalId, then platform default
   const terminal = (opts.terminalId ? terminalRegistry.get(opts.terminalId) : undefined)
     ?? terminalRegistry.listForPlatform()[0];
   if (!terminal) {

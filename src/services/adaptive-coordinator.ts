@@ -1,5 +1,3 @@
-// F-05: Adaptive SLA with Graduated Responses
-// Paper ref: Section 4.3 (Adaptive Coordination Cycle) — graduated response ladder
 
 export type ResponseAction =
   | { action: "ping"; taskId: string; agent: string; message: string }
@@ -56,7 +54,6 @@ export class AdaptiveCoordinator {
     const nowMs = now.getTime();
 
     for (const task of tasks) {
-      // Check consecutive rejections for quarantine
       if (task.consecutiveRejectionsBy) {
         for (const [agent, count] of task.consecutiveRejectionsBy) {
           if (count >= this.config.consecutiveRejectionsForPenalty) {
@@ -77,7 +74,6 @@ export class AdaptiveCoordinator {
       const elapsedMs = nowMs - startedAt;
       const elapsedMinutes = elapsedMs / 60_000;
 
-      // Behind schedule detection
       if (
         task.lastProgressReport &&
         task.estimatedDurationMinutes &&
@@ -100,7 +96,6 @@ export class AdaptiveCoordinator {
         }
       }
 
-      // Unresponsive agent detection
       if (task.lastProgressReport) {
         const reportAge =
           nowMs - new Date(task.lastProgressReport.timestamp).getTime();
@@ -113,7 +108,6 @@ export class AdaptiveCoordinator {
         }
       }
 
-      // Graduated response ladder
       if (task.reassignmentCount >= this.config.maxReassignments) {
         if (elapsedMinutes > this.config.suggestReassignAfterMinutes) {
           actions.push({

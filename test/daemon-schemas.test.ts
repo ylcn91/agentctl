@@ -8,7 +8,6 @@ import {
 } from "../src/daemon/schemas";
 
 describe("DaemonMessageSchema", () => {
-  // --- Pre-auth messages ---
 
   test("accepts valid auth message", () => {
     const result = DaemonMessageSchema.safeParse({
@@ -59,8 +58,6 @@ describe("DaemonMessageSchema", () => {
     const result = DaemonMessageSchema.safeParse({ type: "config_reload" });
     expect(result.success).toBe(true);
   });
-
-  // --- Messaging ---
 
   test("accepts valid send_message", () => {
     const result = DaemonMessageSchema.safeParse({
@@ -132,8 +129,6 @@ describe("DaemonMessageSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  // --- Handoff ---
-
   test("accepts valid handoff_task", () => {
     const result = DaemonMessageSchema.safeParse({
       type: "handoff_task",
@@ -185,8 +180,6 @@ describe("DaemonMessageSchema", () => {
     });
     expect(result.success).toBe(true);
   });
-
-  // --- Tasks ---
 
   test("accepts valid update_task_status", () => {
     const result = DaemonMessageSchema.safeParse({
@@ -274,8 +267,6 @@ describe("DaemonMessageSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  // --- Workspace ---
-
   test("accepts prepare_worktree_for_handoff", () => {
     const result = DaemonMessageSchema.safeParse({
       type: "prepare_worktree_for_handoff",
@@ -300,8 +291,6 @@ describe("DaemonMessageSchema", () => {
     });
     expect(result.success).toBe(true);
   });
-
-  // --- Council ---
 
   test("accepts council_analyze", () => {
     const result = DaemonMessageSchema.safeParse({
@@ -417,8 +406,6 @@ describe("DaemonMessageSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  // --- Knowledge ---
-
   test("accepts search_knowledge", () => {
     const result = DaemonMessageSchema.safeParse({
       type: "search_knowledge",
@@ -436,8 +423,6 @@ describe("DaemonMessageSchema", () => {
     });
     expect(result.success).toBe(true);
   });
-
-  // --- Sessions ---
 
   test("accepts share_session", () => {
     const result = DaemonMessageSchema.safeParse({
@@ -515,8 +500,6 @@ describe("DaemonMessageSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  // --- Workflow ---
-
   test("accepts workflow_trigger", () => {
     const result = DaemonMessageSchema.safeParse({
       type: "workflow_trigger",
@@ -546,8 +529,6 @@ describe("DaemonMessageSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  // --- Health ---
-
   test("accepts health_check", () => {
     const result = DaemonMessageSchema.safeParse({ type: "health_check" });
     expect(result.success).toBe(true);
@@ -557,8 +538,6 @@ describe("DaemonMessageSchema", () => {
     const result = DaemonMessageSchema.safeParse({ type: "health_status" });
     expect(result.success).toBe(true);
   });
-
-  // --- Misc ---
 
   test("accepts query_activity with no filters", () => {
     const result = DaemonMessageSchema.safeParse({
@@ -684,8 +663,6 @@ describe("DaemonMessageSchema", () => {
     });
     expect(result.success).toBe(true);
   });
-
-  // --- Invalid / unknown types ---
 
   test("rejects completely unknown type", () => {
     const result = DaemonMessageSchema.safeParse({

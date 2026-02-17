@@ -247,7 +247,6 @@ describe("checkCognitiveFriction integration with gates", () => {
     const friction = checkCognitiveFriction(payload);
     const gate = getGatedAcceptanceAction(payload);
 
-    // Both should require human involvement
     expect(friction.requiresHumanReview).toBe(true);
     expect(gate.requiresJustification).toBe(true);
   });

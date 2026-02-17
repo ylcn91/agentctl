@@ -2,6 +2,9 @@ import { watch, type FSWatcher } from "fs";
 import type { TddPhase, TddState, TddCycleEvent } from "../types.js";
 import type { EventBus } from "./event-bus.js";
 
+const MAX_OUTPUT_LINES = 10_000;
+const WATCH_DEBOUNCE_MS = 500;
+
 export interface TddEngineOptions {
   testFile: string;
   watchMode?: boolean;
@@ -116,13 +119,35 @@ export class TddEngine {
         stderr: "pipe",
       });
 
-      const [stdout, stderr] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
+      const lines: string[] = [];
+      const streamLines = async (stream: ReadableStream<Uint8Array>, kind: "stdout" | "stderr") => {
+        const reader = stream.getReader();
+        const decoder = new TextDecoder();
+        let partial = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          partial += decoder.decode(value, { stream: true });
+          const parts = partial.split("\n");
+          partial = parts.pop()!;
+          for (const line of parts) {
+            lines.push(line);
+            this.options.eventBus?.emit({
+              type: "TDD_TEST_OUTPUT", testFile: this.options.testFile, line, stream: kind,
+            });
+          }
+        }
+        if (partial) {
+          lines.push(partial);
+          this.options.eventBus?.emit({
+            type: "TDD_TEST_OUTPUT", testFile: this.options.testFile, line: partial, stream: kind,
+          });
+        }
+      };
 
+      await Promise.all([streamLines(proc.stdout, "stdout"), streamLines(proc.stderr, "stderr")]);
       const exitCode = await proc.exited;
-      const output = stdout + (stderr ? "\n" + stderr : "");
+      const output = lines.slice(0, MAX_OUTPUT_LINES).join("\n");
       const duration = Date.now() - startTime;
       const passed = exitCode === 0;
 
@@ -134,7 +159,6 @@ export class TddEngine {
       this.state.lastTestOutput = output;
       this.state.lastTestPassed = passed;
 
-      // Update the last cycle event with test results
       const lastCycle = this.state.cycles[this.state.cycles.length - 1];
       if (lastCycle) {
         lastCycle.passed = passed;
@@ -143,39 +167,21 @@ export class TddEngine {
         lastCycle.duration = duration;
       }
 
-      // Emit events
       if (this.options.eventBus) {
         if (passed) {
-          this.options.eventBus.emit({
-            type: "TDD_TEST_PASS",
-            testFile: this.options.testFile,
-            passCount,
-            duration,
-          });
+          this.options.eventBus.emit({ type: "TDD_TEST_PASS", testFile: this.options.testFile, passCount, duration });
         } else {
-          this.options.eventBus.emit({
-            type: "TDD_TEST_FAIL",
-            testFile: this.options.testFile,
-            failCount,
-            duration,
-          });
+          this.options.eventBus.emit({ type: "TDD_TEST_FAIL", testFile: this.options.testFile, failCount, duration });
         }
       }
 
       this.options.onStateChange?.(this.getState());
-
       return { passed, passCount, failCount, output, duration };
     } finally {
       this.running = false;
     }
   }
 
-  /**
-   * Advance the TDD cycle based on test results.
-   * RED + tests pass -> GREEN
-   * GREEN + tests pass -> REFACTOR
-   * REFACTOR + tests pass -> RED (next cycle)
-   */
   advanceAfterTests(passed: boolean): boolean {
     if (passed) {
       switch (this.state.phase) {
@@ -192,22 +198,21 @@ export class TddEngine {
     return false;
   }
 
+  private watchDebounce: ReturnType<typeof setTimeout> | null = null;
+
   private startWatcher(): void {
     try {
-      this.watcher = watch(this.options.testFile, { persistent: true }, async (eventType) => {
-        if (eventType === "change") {
-          await this.runTests();
-        }
+      this.watcher = watch(this.options.testFile, { persistent: true }, (eventType) => {
+        if (eventType !== "change") return;
+        if (this.watchDebounce) clearTimeout(this.watchDebounce);
+        this.watchDebounce = setTimeout(() => { this.runTests(); }, WATCH_DEBOUNCE_MS);
       });
     } catch {
-      // File watching not available
     }
   }
 
   private stopWatcher(): void {
-    if (this.watcher) {
-      this.watcher.close();
-      this.watcher = null;
-    }
+    if (this.watchDebounce) { clearTimeout(this.watchDebounce); this.watchDebounce = null; }
+    if (this.watcher) { this.watcher.close(); this.watcher = null; }
   }
 }

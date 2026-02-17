@@ -1,10 +1,3 @@
-/**
- * E2E Integration Tests for agentctl
- *
- * Tests the full lifecycle: daemon start, multi-provider account setup,
- * inter-account messaging, task handoffs, MCP bridge, workspace ops,
- * and provider detection for codex, opencode, and claude.
- */
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
@@ -16,10 +9,6 @@ import { setupAccount, teardownAccount } from "../src/services/account-manager";
 import { loadConfig } from "../src/config";
 import { loadTasks } from "../src/services/tasks";
 import type { HubConfig } from "../src/types";
-
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
 
 let dirCounter = 0;
 function freshTestDir(): string {

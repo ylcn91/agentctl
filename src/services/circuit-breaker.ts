@@ -1,5 +1,3 @@
-// F-09: Circuit Breakers
-// Paper ref: Section 4.7 (Safety Mechanisms) — automatic quarantine of misbehaving agents
 
 import type { EventBus, DelegationEvent } from "./event-bus";
 import type { ProgressTracker } from "./progress-tracker";
@@ -153,7 +151,6 @@ export class CircuitBreakerService {
     const loadFn = this.deps.loadTasksFn ?? loadTasks;
     const saveFn = this.deps.saveTasksFn ?? saveTasks;
 
-    // Revoke all active tasks assigned to this agent
     let board = await loadFn();
     const revokedTaskIds: string[] = [];
 
@@ -162,7 +159,6 @@ export class CircuitBreakerService {
         board = assignTask(board, task.id, undefined);
         revokedTaskIds.push(task.id);
 
-        // Emit REASSIGNMENT event for each revoked task
         this.deps.eventBus.emit({
           type: "REASSIGNMENT",
           taskId: task.id,
@@ -186,7 +182,14 @@ export class CircuitBreakerService {
     };
     this.quarantined.set(accountName, record);
 
-    // Log to activity store
+    this.deps.eventBus.emit({
+      type: "CIRCUIT_BREAKER_OPEN",
+      agent: accountName,
+      trigger,
+      reason,
+      revokedTaskIds,
+    });
+
     if (this.deps.activityStore) {
       this.deps.activityStore.emit({
         type: "agent_quarantined",
@@ -205,7 +208,11 @@ export class CircuitBreakerService {
     this.quarantined.delete(accountName);
     this.consecutiveFailures.set(accountName, 0);
 
-    // Log reinstatement
+    this.deps.eventBus.emit({
+      type: "CIRCUIT_BREAKER_CLOSED",
+      agent: accountName,
+    });
+
     if (this.deps.activityStore) {
       this.deps.activityStore.emit({
         type: "agent_reinstated",
@@ -239,18 +246,15 @@ export class CircuitBreakerService {
       return { quarantined: true, reason: record.reason };
     }
 
-    // Check consecutive failures
     const failures = this.getConsecutiveFailures(accountName);
     if (failures >= this.config.consecutiveFailureThreshold) {
       return { quarantined: true, reason: `${failures} consecutive failures` };
     }
 
-    // Check trust drop
     if (this.checkTrustDrop(accountName)) {
       return { quarantined: true, reason: "trust score drop" };
     }
 
-    // Check unresponsive
     if (activeTaskIds.length > 0 && this.checkUnresponsive(accountName, activeTaskIds)) {
       return { quarantined: true, reason: "unresponsive agent" };
     }

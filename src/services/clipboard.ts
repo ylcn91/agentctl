@@ -31,7 +31,6 @@ export async function copyToClipboard(from: string, content: string, label?: str
     createdAt: new Date().toISOString(),
   };
   store.entries.push(entry);
-  // Keep last 50 entries
   if (store.entries.length > 50) {
     store.entries = store.entries.slice(-50);
   }

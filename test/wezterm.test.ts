@@ -68,12 +68,10 @@ describe("WezTerm integration", () => {
       ];
       const config = generateWorkspaceConfig(accounts);
 
-      // Should have all three accounts
       expect(config).toContain("CLAUDE_CONFIG_DIR=/home/user/.claude claude");
       expect(config).toContain("CLAUDE_CONFIG_DIR=/home/user/.claude-work claude");
       expect(config).toContain("CLAUDE_CONFIG_DIR=/home/user/.claude-admin claude");
 
-      // Each account should have its own pane entry
       const paneCount = (config.match(/args = \{/g) ?? []).length;
       expect(paneCount).toBe(3);
     });
@@ -84,9 +82,7 @@ describe("WezTerm integration", () => {
       ];
       const config = generateWorkspaceConfig(accounts);
 
-      // Should not contain literal tilde
       expect(config).not.toContain("~/.claude");
-      // Should contain expanded path
       expect(config).toContain(`CLAUDE_CONFIG_DIR=${process.env.HOME}/.claude`);
     });
 
@@ -125,7 +121,6 @@ describe("WezTerm integration", () => {
     });
 
     test("account names with shell metacharacters are passed safely in argument arrays", () => {
-      // These names would be dangerous in shell interpolation but safe in Bun.spawn arrays
       const dangerousNames = [
         '$(whoami)',
         '`rm -rf /`',
@@ -135,10 +130,7 @@ describe("WezTerm integration", () => {
         "test' OR '1'='1",
       ];
       for (const name of dangerousNames) {
-        // launchInWezTermTab passes account.name as an element in a Bun.spawn array,
-        // so it is never interpreted by the shell. Verify it doesn't throw for any input.
         expect(() => {
-          // Just check setTabTitle can handle any name without breaking
           const cmd = setTabTitle(name);
           expect(cmd).toContain(name);
         }).not.toThrow();

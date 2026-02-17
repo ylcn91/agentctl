@@ -5,10 +5,9 @@ import {
   anonymizeForPeerReview,
   DEFAULT_COUNCIL_CONFIG,
 } from "./council-framework";
-import type { LLMCaller, CouncilServiceConfig } from "./council-framework";
+import type { LLMCaller, StreamingLLMCaller, CouncilServiceConfig } from "./council-framework";
 
-// Re-export framework types and utilities for backwards compatibility
-export { parseJSONFromLLM, buildProviderCommand, createAccountCaller } from "./council-framework";
+export { parseJSONFromLLM, buildProviderCommand, createAccountCaller, createStreamingAccountCaller } from "./council-framework";
 export type { LLMCaller } from "./council-framework";
 export { type CouncilServiceConfig as CouncilConfig } from "./council-framework";
 
@@ -30,11 +29,6 @@ export interface CouncilAnalysis {
   };
 }
 
-/**
- * Calculate aggregate rankings from peer review results.
- * Each ranking is an array of 0-based indices (best-to-worst).
- * Returns accounts sorted by average rank (lower is better).
- */
 export function calculateAggregateRankings(
   rankings: CouncilRanking[],
   accounts: string[],
@@ -47,7 +41,7 @@ export function calculateAggregateRankings(
       if (accountIndex < 0 || accountIndex >= accounts.length) continue;
       const account = accounts[accountIndex];
       const entry = positionSums.get(account) ?? { total: 0, count: 0 };
-      entry.total += position + 1; // 1-based rank
+      entry.total += position + 1;
       entry.count += 1;
       positionSums.set(account, entry);
     }
@@ -99,9 +93,9 @@ Respond ONLY with valid JSON, no other text.`;
 
 export class CouncilService {
   private config: CouncilServiceConfig;
-  private callLLM: LLMCaller;
+  private callLLM: LLMCaller | StreamingLLMCaller;
 
-  constructor(config: Partial<CouncilServiceConfig> & Pick<CouncilServiceConfig, "members" | "chairman">, llmCaller?: LLMCaller) {
+  constructor(config: Partial<CouncilServiceConfig> & Pick<CouncilServiceConfig, "members" | "chairman">, llmCaller?: LLMCaller | StreamingLLMCaller) {
     this.config = { ...DEFAULT_COUNCIL_CONFIG, ...config };
 
     if (llmCaller) {

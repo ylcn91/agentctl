@@ -1,13 +1,3 @@
-/**
- * Auth reconnection behavioral tests.
- *
- * Tests the bridge reconnection logic by examining:
- * - MAX_RECONNECT_ATTEMPTS bounds reconnection
- * - Exponential backoff delay calculation
- * - Auth failure handling (auth_fail response doesn't crash)
- * - Reconnection uses correct token for re-auth
- * - The bridge module's structural guarantees
- */
 import { describe, test, expect, afterEach } from "bun:test";
 import { readFileSync } from "fs";
 import { join } from "path";

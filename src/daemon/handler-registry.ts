@@ -9,6 +9,7 @@ import { registerSessionHandlers } from "./handlers/sessions";
 import { registerWorkflowHandlers } from "./handlers/workflow";
 import { registerHealthHandlers } from "./handlers/health";
 import { registerMiscHandlers } from "./handlers/misc";
+import { registerStreamingHandlers } from "./handlers/streaming";
 
 export function buildHandlerMap(ctx: HandlerContext): Record<string, HandlerFn> {
   return {
@@ -22,5 +23,6 @@ export function buildHandlerMap(ctx: HandlerContext): Record<string, HandlerFn> 
     ...registerWorkflowHandlers(ctx),
     ...registerHealthHandlers(ctx),
     ...registerMiscHandlers(ctx),
+    ...registerStreamingHandlers(ctx),
   };
 }

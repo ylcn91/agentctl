@@ -1,14 +1,10 @@
-// Entire.io session monitoring adapter
-// Reads session state files from .git/entire-sessions/ and maps changes to agentctl EventBus events
 
 import { watch, existsSync, readdirSync, readFileSync, type FSWatcher } from "fs";
 import { join, basename } from "path";
 import type { EventBus } from "./event-bus";
 
-/** entire.io session phase (mirrors session/phase.go) */
 export type EntirePhase = "active" | "active_committed" | "idle" | "ended" | "";
 
-/** entire.io token usage (mirrors agent/types.go) */
 export interface EntireTokenUsage {
   input_tokens: number;
   cache_creation_tokens: number;
@@ -18,7 +14,6 @@ export interface EntireTokenUsage {
   subagent_tokens?: EntireTokenUsage;
 }
 
-/** entire.io session state on disk (mirrors session/state.go JSON tags) */
 export interface EntireSessionState {
   session_id: string;
   cli_version?: string;
@@ -31,7 +26,6 @@ export interface EntireSessionState {
   phase?: EntirePhase;
   pending_checkpoint_id?: string;
   last_interaction_time?: string;
-  /** JSON tag is "checkpoint_count" for backward compat */
   checkpoint_count: number;
   files_touched?: string[];
   agent_type?: string;
@@ -40,7 +34,6 @@ export interface EntireSessionState {
   transcript_path?: string;
 }
 
-/** Derived metrics for an entire.io session */
 export interface EntireSessionMetrics {
   sessionId: string;
   phase: EntirePhase;
@@ -54,7 +47,6 @@ export interface EntireSessionMetrics {
   agentType: string;
 }
 
-/** Default context window sizes by provider */
 const CONTEXT_WINDOWS: Record<string, number> = {
   "Claude Code": 200_000,
   "Gemini CLI": 1_000_000,
@@ -91,7 +83,6 @@ export class EntireAdapter {
       return false;
     }
 
-    // Load initial state for all existing sessions
     try {
       const files = readdirSync(this.sessionsDir);
       for (const file of files) {
@@ -103,11 +94,9 @@ export class EntireAdapter {
             this.previousStates.set(state.session_id, state);
           }
         } catch {
-          // Skip corrupted files
         }
       }
     } catch {
-      // Directory read failed
     }
 
     this.watcher = watch(this.sessionsDir, (eventType, filename) => {
@@ -122,7 +111,6 @@ export class EntireAdapter {
         if (prev) {
           this.processSessionUpdate(prev, current);
         } else {
-          // New session — check if it started active
           if (current.phase === "active" || current.phase === "active_committed") {
             const taskId = this.sessionTaskMap.get(current.session_id) ?? current.session_id;
             this.eventBus.emit({
@@ -134,7 +122,6 @@ export class EntireAdapter {
         }
         this.previousStates.set(current.session_id, current);
       } catch {
-        // File may have been deleted or is being written
       }
     });
 
@@ -154,7 +141,6 @@ export class EntireAdapter {
       const data = readFileSync(filePath, "utf-8");
       const parsed = JSON.parse(data) as EntireSessionState;
       if (!parsed.session_id) return null;
-      // Normalize empty phase to "idle"
       if (!parsed.phase) {
         parsed.phase = "idle";
       }
@@ -170,7 +156,6 @@ export class EntireAdapter {
     const prevPhaseActive = prev.phase === "active" || prev.phase === "active_committed";
     const currPhaseActive = current.phase === "active" || current.phase === "active_committed";
 
-    // Phase transition: became active
     if (!prevPhaseActive && currPhaseActive) {
       this.eventBus.emit({
         type: "TASK_STARTED",
@@ -179,7 +164,6 @@ export class EntireAdapter {
       });
     }
 
-    // StepCount increased — checkpoint reached
     if (current.checkpoint_count > prev.checkpoint_count) {
       const expected = this.expectedFiles.get(current.session_id);
       const percent = expected && expected > 0
@@ -194,7 +178,6 @@ export class EntireAdapter {
       });
     }
 
-    // Token usage changed
     const prevTokens = totalTokens(prev.token_usage);
     const currTokens = totalTokens(current.token_usage);
     if (currTokens > prevTokens) {
@@ -213,7 +196,6 @@ export class EntireAdapter {
         },
       });
 
-      // Warn if approaching context limit
       if (saturation > 0.8) {
         this.eventBus.emit({
           type: "RESOURCE_WARNING",
@@ -224,7 +206,6 @@ export class EntireAdapter {
       }
     }
 
-    // Files touched changed
     const prevFiles = prev.files_touched?.length ?? 0;
     const currFiles = current.files_touched?.length ?? 0;
     if (currFiles > prevFiles) {
@@ -239,7 +220,6 @@ export class EntireAdapter {
       });
     }
 
-    // Phase transition: became idle or ended
     if (prevPhaseActive && (current.phase === "idle" || current.phase === "ended")) {
       this.eventBus.emit({
         type: "TASK_COMPLETED",

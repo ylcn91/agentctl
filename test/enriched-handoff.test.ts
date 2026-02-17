@@ -193,7 +193,6 @@ describe("validateHandoff — enriched fields", () => {
     const result = validateHandoff({ complexity: "extreme" });
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      // 4 required field errors + 1 invalid enum
       expect(result.errors.length).toBe(5);
     }
   });

@@ -89,7 +89,6 @@ describe("handoff templates", () => {
 
     expect(merged.goal).toBe("Fix login timeout bug");
     expect(merged.run_commands).toEqual(["bun test test/auth.test.ts"]);
-    // acceptance_criteria from template
     expect(merged.acceptance_criteria.length).toBeGreaterThan(0);
     expect(merged.blocked_by).toEqual(["none"]);
   });

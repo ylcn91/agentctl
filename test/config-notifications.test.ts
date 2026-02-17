@@ -50,7 +50,6 @@ describe("notifications config round-trip", () => {
     const origDir = process.env.AGENTCTL_DIR;
     process.env.AGENTCTL_DIR = TEST_DIR;
 
-    // Save with proper name for setConfigValue
     const setValConfigPath = join(TEST_DIR, "config.json");
     await saveConfig(config, setValConfigPath);
 

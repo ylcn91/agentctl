@@ -3,8 +3,6 @@ import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
-// ─── paths.ts ────────────────────────────────────────────────────────
-
 describe("paths module", () => {
   const originalHome = process.env.HOME;
   const originalHubDir = process.env.AGENTCTL_DIR;
@@ -48,8 +46,6 @@ describe("paths module", () => {
     expect(paths.getTasksPath()).toBe("/hub/tasks.json");
   });
 });
-
-// ─── base-store.ts ───────────────────────────────────────────────────
 
 describe("BaseStore", () => {
   test("creates a database with WAL mode", async () => {

@@ -3,7 +3,6 @@ import { getLinksForTask } from "./external-links";
 import type { TaskStatus } from "./tasks";
 
 function parseExternalId(externalId: string): { owner: string; repo: string; number: number } {
-  // Format: "owner/repo#123"
   const hashIdx = externalId.lastIndexOf("#");
   if (hashIdx === -1) throw new Error(`Invalid externalId format: ${externalId}`);
   const repoPath = externalId.slice(0, hashIdx);

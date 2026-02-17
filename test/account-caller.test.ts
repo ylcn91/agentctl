@@ -41,11 +41,12 @@ describe("buildProviderCommand", () => {
     expect(output).toBe("plain text output");
   });
 
-  test("codex-cli provider uses codex -q with CODEX_HOME env", () => {
+  test("codex-cli provider uses codex exec with CODEX_HOME env", () => {
     const account = makeAccount({ provider: "codex-cli", configDir: "/tmp/codex" });
     const cmd = buildProviderCommand(account, "test prompt");
-    expect(cmd.cmd).toEqual(["codex", "-q"]);
+    expect(cmd.cmd).toEqual(["codex", "exec"]);
     expect(cmd.env.CODEX_HOME).toBe("/tmp/codex");
+    expect(cmd.stdinInput).toBe(true);
   });
 
   test("codex-cli parseOutput returns stdout as-is", () => {
@@ -54,10 +55,11 @@ describe("buildProviderCommand", () => {
     expect(parseOutput("raw output")).toBe("raw output");
   });
 
-  test("opencode provider uses opencode run", () => {
+  test("opencode provider uses opencode run with prompt as positional arg", () => {
     const account = makeAccount({ provider: "opencode" });
     const cmd = buildProviderCommand(account, "test prompt");
-    expect(cmd.cmd).toEqual(["opencode", "run"]);
+    expect(cmd.cmd).toEqual(["opencode", "run", "--", "test prompt"]);
+    expect(cmd.stdinInput).toBe(false);
   });
 
   test("opencode parseOutput returns stdout as-is", () => {
@@ -66,10 +68,11 @@ describe("buildProviderCommand", () => {
     expect(parseOutput("output")).toBe("output");
   });
 
-  test("cursor-agent provider uses agent", () => {
+  test("cursor-agent provider uses agent -p with json output", () => {
     const account = makeAccount({ provider: "cursor-agent" });
     const cmd = buildProviderCommand(account, "test prompt");
-    expect(cmd.cmd).toEqual(["agent"]);
+    expect(cmd.cmd).toEqual(["agent", "-p", "--output-format", "json"]);
+    expect(cmd.stdinInput).toBe(true);
   });
 
   test("cursor-agent parseOutput returns stdout as-is", () => {
@@ -136,11 +139,13 @@ describe("createAccountCaller", () => {
       makeAccount({ name: "alice", provider: "claude-code" }),
       makeAccount({ name: "bob", provider: "codex-cli" }),
     ];
-    const caller = createAccountCaller(accounts);
+    const caller = createAccountCaller(accounts, 1000);
 
-    // Both should be accessible (will fail at Bun.spawn since we're not mocking it,
-    // but should not throw "Account not found")
-    await expect(caller("alice", "sys", "usr")).rejects.not.toThrow("Account not found");
-    await expect(caller("bob", "sys", "usr")).rejects.not.toThrow("Account not found");
+    const aliceResult = caller("alice", "sys", "usr").catch((e: Error) => e.message);
+    const bobResult = caller("bob", "sys", "usr").catch((e: Error) => e.message);
+
+    const [a, b] = await Promise.all([aliceResult, bobResult]);
+    expect(a).not.toContain("Account not found");
+    expect(b).not.toContain("Account not found");
   });
 });

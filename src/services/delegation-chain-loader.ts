@@ -15,10 +15,6 @@ export interface DelegationChainData {
   blockReason?: string;
 }
 
-/**
- * Read the first .token file from the tokens directory (async).
- * Returns { account, token } or null if none found.
- */
 async function readFirstToken(
   tokensDir: string,
 ): Promise<{ account: string; token: string } | null> {
@@ -34,10 +30,6 @@ async function readFirstToken(
   }
 }
 
-/**
- * Query the daemon's activity store for DELEGATION_CHAIN events.
- * Falls back to empty if no daemon is running.
- */
 export async function fetchDelegationChains(): Promise<DelegationChainData[]> {
   const sockPath = getSockPath();
   if (!existsSync(sockPath)) return [];

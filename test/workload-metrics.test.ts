@@ -232,7 +232,6 @@ describe("computeWorkloadModifier", () => {
       openCount: 20,
       recentThroughput: 0,
     });
-    // -15 (wip cap) + -10 (open cap) = -25
     expect(result).toBe(-25);
   });
 
@@ -243,7 +242,6 @@ describe("computeWorkloadModifier", () => {
       openCount: 2,
       recentThroughput: 1,
     });
-    // -5 (wip) + -4 (open) + 5 (throughput) = -4
     expect(result).toBe(-4);
   });
 
@@ -254,7 +252,6 @@ describe("computeWorkloadModifier", () => {
       openCount: 1,
       recentThroughput: 3,
     });
-    // -5 (wip) + -2 (open) + 15 (throughput, capped) = 8
     expect(result).toBe(8);
   });
 });

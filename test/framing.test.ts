@@ -77,7 +77,6 @@ describe("createLineParser", () => {
     const messages: any[] = [];
     const parser = createLineParser((msg) => messages.push(msg));
 
-    // Should not throw, just console.warn
     parser.feed('invalid\n{"ok":true}\n');
     expect(messages).toHaveLength(1);
     expect(messages[0].ok).toBe(true);

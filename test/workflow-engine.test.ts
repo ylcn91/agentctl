@@ -89,12 +89,10 @@ test("trigger linear 3-step workflow -- first step scheduled", async () => {
   const steps = store.getStepRunsForRun(runId);
   expect(steps).toHaveLength(3);
 
-  // Step A should be assigned (no dependencies)
   const stepA = steps.find(s => s.step_id === "a");
   expect(stepA!.status).toBe("assigned");
   expect(stepA!.assigned_to).toBe("agent-1");
 
-  // Steps B and C should still be pending
   const stepB = steps.find(s => s.step_id === "b");
   expect(stepB!.status).toBe("pending");
 
@@ -106,12 +104,10 @@ test("trigger workflow with parallel steps -- independent steps scheduled togeth
   const def = parallelWorkflow();
   const runId = await engine.triggerWorkflow(def, "");
 
-  // Start should be assigned
   const steps = store.getStepRunsForRun(runId);
   const start = steps.find(s => s.step_id === "start");
   expect(start!.status).toBe("assigned");
 
-  // Complete start step
   await engine.onStepCompleted(runId, "start", "accepted", def);
 
   const updatedSteps = store.getStepRunsForRun(runId);
@@ -119,10 +115,8 @@ test("trigger workflow with parallel steps -- independent steps scheduled togeth
   const branchB = updatedSteps.find(s => s.step_id === "branch_b");
   const merge = updatedSteps.find(s => s.step_id === "merge");
 
-  // Both branches should be assigned
   expect(branchA!.status).toBe("assigned");
   expect(branchB!.status).toBe("assigned");
-  // Merge should still be pending
   expect(merge!.status).toBe("pending");
 });
 
@@ -130,18 +124,15 @@ test("trigger workflow with condition -- skips step when condition false", async
   const def = conditionalWorkflow();
   const runId = await engine.triggerWorkflow(def, "");
 
-  // Complete review with "accepted"
   await engine.onStepCompleted(runId, "review", "accepted", def);
 
   const steps = store.getStepRunsForRun(runId);
   const fix = steps.find(s => s.step_id === "fix");
   const deploy = steps.find(s => s.step_id === "deploy");
 
-  // "fix" should be skipped (condition: result == 'rejected', but result was 'accepted')
   expect(fix!.status).toBe("skipped");
   expect(fix!.result).toBe("condition_not_met");
 
-  // "deploy" should be assigned (condition: result == 'accepted' matches)
   expect(deploy!.status).toBe("assigned");
 });
 
@@ -149,14 +140,12 @@ test("onStepCompleted unblocks dependent steps", async () => {
   const def = linearWorkflow();
   const runId = await engine.triggerWorkflow(def, "");
 
-  // Complete step A
   await engine.onStepCompleted(runId, "a", "accepted", def);
 
   const steps = store.getStepRunsForRun(runId);
   const stepB = steps.find(s => s.step_id === "b");
   expect(stepB!.status).toBe("assigned");
 
-  // Step C should still be pending
   const stepC = steps.find(s => s.step_id === "c");
   expect(stepC!.status).toBe("pending");
 });
@@ -173,12 +162,10 @@ test("onStepFailed with retry -- re-schedules", async () => {
 
   const runId = await engine.triggerWorkflow(def, "");
 
-  // First failure -- should retry (attempt 1 <= max_retries 2)
   await engine.onStepFailed(runId, "flaky", "timeout", def);
 
   const steps = store.getStepRunsForRun(runId);
   const step = steps.find(s => s.step_id === "flaky");
-  // After retry, it should be re-assigned (pending -> assigned again by scheduleReadySteps)
   expect(step!.attempt).toBe(2);
   expect(step!.status).toBe("assigned");
 });
@@ -197,7 +184,6 @@ test("onStepFailed with abort -- marks run failed", async () => {
 
   const runId = await engine.triggerWorkflow(def, "");
 
-  // Fail step A with no retries
   await engine.onStepFailed(runId, "a", "crashed", def);
 
   const run = store.getRun(runId);
@@ -222,12 +208,10 @@ test("cancelWorkflow skips pending steps", async () => {
   expect(run!.status).toBe("cancelled");
 
   const steps = store.getStepRunsForRun(runId);
-  // Step A was assigned, so it should be skipped
   const stepA = steps.find(s => s.step_id === "a");
   expect(stepA!.status).toBe("skipped");
   expect(stepA!.result).toBe("cancelled");
 
-  // Steps B and C were pending, should be skipped
   for (const id of ["b", "c"]) {
     const step = steps.find(s => s.step_id === id);
     expect(step!.status).toBe("skipped");
@@ -351,11 +335,9 @@ describe("circular dependency detection", () => {
     const steps = store.getStepRunsForRun(runId);
     expect(steps).toHaveLength(4);
 
-    // Only step A should be assigned (no deps)
     const stepA = steps.find(s => s.step_id === "a");
     expect(stepA!.status).toBe("assigned");
 
-    // B, C, D should be pending
     for (const id of ["b", "c", "d"]) {
       const step = steps.find(s => s.step_id === id);
       expect(step!.status).toBe("pending");

@@ -10,7 +10,6 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  // Reset module-level singleton before cleanup
   const { _resetStore } = await import("../src/services/external-links");
   _resetStore();
   rmSync(TEST_DIR, { recursive: true, force: true });

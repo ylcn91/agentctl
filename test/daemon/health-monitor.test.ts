@@ -86,7 +86,7 @@ describe("HealthMonitor", () => {
     expect(statuses).toHaveLength(3);
     expect(statuses[0].status).toBe("healthy");
     expect(statuses[1].status).toBe("healthy");
-    expect(statuses[2].status).toBe("critical"); // charlie never connected
+    expect(statuses[2].status).toBe("critical");
   });
 
   test("getHealth returns null for unknown account", () => {
@@ -96,7 +96,6 @@ describe("HealthMonitor", () => {
 
   test("stale activity sets status to degraded", () => {
     const monitor = new HealthMonitor();
-    // Simulate stale activity by setting lastActivity to 15 minutes ago
     const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
     monitor.update("alice", {
       connected: true,
@@ -120,7 +119,6 @@ describe("HealthMonitor", () => {
     const monitor = new HealthMonitor();
     monitor.markActive("alice");
     monitor.recordError("alice");
-    // Update only rateLimited, should preserve errorCount
     monitor.update("alice", { rateLimited: true });
     const health = monitor.getHealth("alice");
     expect(health!.errorCount).toBe(1);
@@ -149,15 +147,15 @@ describe("HealthMonitor - multi-account aggregation", () => {
     monitor.markActive("alice");
     monitor.markActive("bob");
     monitor.markActive("charlie");
-    monitor.recordError("bob"); // degraded
-    monitor.markDisconnected("charlie"); // critical
+    monitor.recordError("bob");
+    monitor.markDisconnected("charlie");
 
     const aggregate = monitor.getAggregateStatus(["alice", "bob", "charlie"]);
     expect(aggregate.total).toBe(3);
     expect(aggregate.healthy).toBe(1);
     expect(aggregate.degraded).toBe(1);
     expect(aggregate.critical).toBe(1);
-    expect(aggregate.overall).toBe("critical"); // at least one critical
+    expect(aggregate.overall).toBe("critical");
     expect(aggregate.accounts).toHaveLength(3);
   });
 
@@ -175,7 +173,7 @@ describe("HealthMonitor - multi-account aggregation", () => {
   test("aggregate overall is degraded when worst is degraded", () => {
     monitor.markActive("alice");
     monitor.markActive("bob");
-    monitor.recordError("bob"); // degraded
+    monitor.recordError("bob");
 
     const aggregate = monitor.getAggregateStatus(["alice", "bob"]);
     expect(aggregate.overall).toBe("degraded");
@@ -224,7 +222,6 @@ describe("HealthMonitor - status transitions", () => {
     monitor.recordError("alice");
     expect(monitor.getHealth("alice")!.status).toBe("degraded");
 
-    // Reset error count to 0
     monitor.update("alice", { errorCount: 0 });
     expect(monitor.getHealth("alice")!.status).toBe("healthy");
   });
@@ -276,7 +273,6 @@ describe("HealthMonitor - error rate calculation", () => {
     const health = monitor.getHealth("newaccount");
     expect(health).not.toBeNull();
     expect(health!.errorCount).toBe(1);
-    // Not connected, so critical
     expect(health!.status).toBe("critical");
   });
 });
@@ -293,7 +289,7 @@ describe("HealthMonitor - rate limit tracking", () => {
     monitor.recordRateLimit("alice");
     expect(monitor.getHealth("alice")!.status).toBe("critical");
     expect(monitor.getHealth("alice")!.rateLimited).toBe(true);
-    expect(monitor.getHealth("alice")!.connected).toBe(true); // still connected
+    expect(monitor.getHealth("alice")!.connected).toBe(true);
   });
 
   test("clearing rate limit restores to appropriate status", () => {
@@ -308,11 +304,10 @@ describe("HealthMonitor - rate limit tracking", () => {
 
   test("rate limit with existing errors stays critical", () => {
     monitor.markActive("alice");
-    monitor.recordError("alice"); // degraded
-    monitor.recordRateLimit("alice"); // critical
+    monitor.recordError("alice");
+    monitor.recordRateLimit("alice");
     expect(monitor.getHealth("alice")!.status).toBe("critical");
 
-    // Clear rate limit, but errors remain -> degraded
     monitor.clearRateLimit("alice");
     expect(monitor.getHealth("alice")!.status).toBe("degraded");
   });
@@ -344,17 +339,14 @@ describe("HealthMonitor - stale account detection", () => {
   });
 
   test("getStatuses recomputes staleness on each call", () => {
-    // Set activity to exactly 10 minutes ago (borderline)
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     monitor.update("alice", {
       connected: true,
       lastActivity: tenMinAgo,
     });
-    // At exactly 10 min it should still be healthy (threshold is >10min)
     const statuses = monitor.getStatuses(["alice"]);
     expect(statuses[0].status).toBe("healthy");
 
-    // Set to 11 minutes ago -> degraded
     const elevenMinAgo = new Date(Date.now() - 11 * 60 * 1000).toISOString();
     monitor.update("alice", {
       connected: true,

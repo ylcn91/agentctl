@@ -27,7 +27,6 @@ describe("Dashboard data loading", () => {
 
     expect(stats.totalSessions).toBe(192);
     expect(stats.todayActivity?.messageCount).toBe(1508);
-    // 1508 msgs is way over 225 limit, so capped at 100%
     expect(quota.percent).toBe(100);
     expect(quota.confidence).toBe("medium");
   });
@@ -145,7 +144,6 @@ describe("AccountCard data shape", () => {
       label: "~100% (est.)",
     };
 
-    // Verify the data shapes are compatible (type check)
     expect(account.name).toBe("claude");
     expect(stats.todayActivity?.messageCount).toBe(1508);
     expect(stats.todayTokens?.["claude-opus-4-6"]).toBe(66694);

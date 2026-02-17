@@ -1,6 +1,3 @@
-// Integration test helpers for daemon lifecycle
-// Provides utilities for starting a test daemon, authenticating, and sending messages
-// over the Unix socket protocol (newline-delimited JSON).
 
 import { createConnection, type Socket } from "net";
 import { join } from "path";

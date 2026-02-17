@@ -8,6 +8,11 @@ import {
   DEFAULT_COUNCIL_CONFIG,
   DEFAULT_TIMEOUT_MS,
   LLMTimeoutError,
+  runCouncilDirect,
+  runCouncilDiscussionDirect,
+  type CouncilDirectEvent,
+  type DirectCouncilOpts,
+  type DirectDiscussionOpts,
 } from "../src/services/council-framework";
 import type { AccountConfig } from "../src/types";
 
@@ -149,17 +154,19 @@ describe("buildProviderCommand", () => {
     expect(cmd.env.CLAUDE_CONFIG_DIR).toBe("/tmp/claude");
   });
 
-  test("codex-cli provider uses codex -q", () => {
+  test("codex-cli provider uses codex exec", () => {
     const account = makeAccount({ provider: "codex-cli", configDir: "/tmp/codex" });
     const cmd = buildProviderCommand(account, "test prompt");
-    expect(cmd.cmd).toEqual(["codex", "-q"]);
+    expect(cmd.cmd).toEqual(["codex", "exec"]);
     expect(cmd.env.CODEX_HOME).toBe("/tmp/codex");
+    expect(cmd.stdinInput).toBe(true);
   });
 
-  test("opencode provider uses opencode run", () => {
+  test("opencode provider uses opencode run with prompt arg", () => {
     const account = makeAccount({ provider: "opencode" });
     const cmd = buildProviderCommand(account, "test prompt");
-    expect(cmd.cmd).toEqual(["opencode", "run"]);
+    expect(cmd.cmd).toEqual(["opencode", "run", "--", "test prompt"]);
+    expect(cmd.stdinInput).toBe(false);
   });
 
   test("throws for unsupported provider", () => {
@@ -179,6 +186,15 @@ describe("createAccountCaller", () => {
   test("throws for empty account list", async () => {
     const caller = createAccountCaller([]);
     await expect(caller("any", "system", "user")).rejects.toThrow("Account not found: any");
+  });
+
+  test("throws when no auth credentials for claude-code account", async () => {
+    const caller = createAccountCaller([
+      makeAccount({ name: "no-auth-acct", provider: "claude-code" }),
+    ]);
+    await expect(caller("no-auth-acct", "system", "user")).rejects.toThrow(
+      /No auth credentials/,
+    );
   });
 
   test("accepts optional timeoutMs parameter", () => {
@@ -350,4 +366,116 @@ describe("timeout enforcement with real processes", () => {
     expect(completedAccounts).not.toContain("beta");
     expect(results.map((r) => r.account).sort()).toEqual(["alpha", "gamma"]);
   }, 10_000);
+});
+
+describe("runCouncilDirect", () => {
+  test("exports are defined", () => {
+    expect(runCouncilDirect).toBeFunction();
+  });
+
+  test("emits error event when no members provided", async () => {
+    const events: CouncilDirectEvent[] = [];
+    await runCouncilDirect({
+      accounts: [],
+      members: [],
+      chairman: "chair",
+      goal: "test goal",
+      onEvent: (e) => events.push(e),
+    });
+
+    // With no accounts, CouncilService stage1 will return 0 analyses
+    // which triggers the "No analyses returned" error path
+    const errorEvent = events.find((e) => e.type === "error");
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent!.type).toBe("error");
+  });
+
+  test("emits stage_start before error when accounts are empty", async () => {
+    const events: CouncilDirectEvent[] = [];
+    await runCouncilDirect({
+      accounts: [makeAccount({ name: "ghost", provider: "claude-code" })],
+      members: ["ghost"],
+      chairman: "ghost",
+      goal: "test goal",
+      timeoutMs: 2000,
+      onEvent: (e) => events.push(e),
+    });
+
+    // Should at least emit stage_start for analysis before failing
+    const stageStart = events.find((e) => e.type === "stage_start");
+    expect(stageStart).toBeDefined();
+    expect(stageStart!.type).toBe("stage_start");
+    if (stageStart!.type === "stage_start") {
+      expect(stageStart!.stage).toBe("analysis");
+    }
+  });
+
+  test("DirectCouncilOpts type is well-formed", () => {
+    const opts: DirectCouncilOpts = {
+      accounts: [],
+      members: ["a", "b"],
+      chairman: "a",
+      goal: "test",
+      timeoutMs: 5000,
+      onEvent: () => {},
+    };
+    expect(opts.members).toHaveLength(2);
+    expect(opts.timeoutMs).toBe(5000);
+  });
+});
+
+describe("runCouncilDiscussionDirect", () => {
+  test("exports are defined", () => {
+    expect(runCouncilDiscussionDirect).toBeFunction();
+  });
+
+  test("emits error event when no members provided", async () => {
+    const events: any[] = [];
+    await runCouncilDiscussionDirect({
+      accounts: [],
+      members: [],
+      chairman: "chair",
+      goal: "test goal",
+      onEvent: (e) => events.push(e),
+    });
+
+    const errorEvent = events.find((e: any) => e.type === "error");
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent.message).toContain("No members");
+  });
+
+  test("DirectDiscussionOpts type is well-formed", () => {
+    const opts: DirectDiscussionOpts = {
+      accounts: [],
+      members: ["a", "b"],
+      chairman: "a",
+      goal: "test",
+      maxRounds: 3,
+      researchTimeoutMs: 60_000,
+      discussionTimeoutMs: 30_000,
+      decisionTimeoutMs: 60_000,
+      onEvent: () => {},
+    };
+    expect(opts.members).toHaveLength(2);
+    expect(opts.maxRounds).toBe(3);
+    expect(opts.researchTimeoutMs).toBe(60_000);
+  });
+
+  test("emits done event with empty result when no members", async () => {
+    const events: any[] = [];
+    await runCouncilDiscussionDirect({
+      accounts: [],
+      members: [],
+      chairman: "chair",
+      goal: "test",
+      onEvent: (e) => events.push(e),
+    });
+
+    const doneEvent = events.find((e: any) => e.type === "done");
+    expect(doneEvent).toBeDefined();
+    expect(doneEvent.result.goal).toBe("test");
+    expect(doneEvent.result.research).toEqual([]);
+    expect(doneEvent.result.discussion).toEqual([]);
+    expect(doneEvent.result.decision).toBeNull();
+  });
 });

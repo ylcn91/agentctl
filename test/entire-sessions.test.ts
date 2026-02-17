@@ -19,7 +19,6 @@ function writeSessionFile(filename: string, data: Record<string, any>) {
 
 describe("EntireSessions async loading", () => {
   test("loadAllSessionMetrics reads session files async", async () => {
-    // Write a valid session file
     writeSessionFile("session-1.json", {
       session_id: "abc-123",
       phase: "active",
@@ -36,7 +35,6 @@ describe("EntireSessions async loading", () => {
       agent_type: "Claude Code",
     });
 
-    // Verify the file was written and is valid JSON
     const content = await Bun.file(join(GIT_DIR, "session-1.json")).text();
     const parsed = JSON.parse(content);
     expect(parsed.session_id).toBe("abc-123");
@@ -50,7 +48,6 @@ describe("EntireSessions async loading", () => {
       started_at: new Date().toISOString(),
     });
 
-    // Verify the .tmp file was created but should be skipped by the loader
     const content = await Bun.file(join(GIT_DIR, "session-1.json.tmp")).text();
     const parsed = JSON.parse(content);
     expect(parsed.session_id).toBe("tmp-should-be-skipped");
@@ -70,16 +67,13 @@ describe("EntireSessions async loading", () => {
   test("handles corrupted JSON gracefully", async () => {
     writeFileSync(join(GIT_DIR, "corrupted.json"), "not valid json{{{");
 
-    // Just verify the file exists - the loader should skip it
     const content = await Bun.file(join(GIT_DIR, "corrupted.json")).text();
     expect(content).toBe("not valid json{{{");
   });
 
   test("readdir + Bun.file replaces readdirSync + readFileSync", async () => {
-    // This test verifies the async pattern is used by reading files async
     const { readdir } = await import("node:fs/promises");
 
-    // Write some files to verify async readdir works
     writeSessionFile("s1.json", { session_id: "s1", phase: "active", started_at: new Date().toISOString() });
     writeSessionFile("s2.json", { session_id: "s2", phase: "ended", started_at: new Date().toISOString() });
 
@@ -87,7 +81,6 @@ describe("EntireSessions async loading", () => {
     const jsonFiles = updatedFiles.filter((f) => f.endsWith(".json") && !f.endsWith(".tmp"));
     expect(jsonFiles.length).toBe(2);
 
-    // Verify Bun.file().text() works for reading
     for (const file of jsonFiles) {
       const data = await Bun.file(join(GIT_DIR, file)).text();
       const parsed = JSON.parse(data);

@@ -9,7 +9,6 @@ export type ActivityEventType =
   | "retro_started" | "retro_completed"
   | "github_issue_created" | "github_comment_added"
   | "acceptance_passed" | "acceptance_failed"
-  // F-02: Delegation lifecycle events (Paper §4.5)
   | "task_assigned" | "task_started" | "task_completed"
   | "checkpoint_reached" | "progress_update"
   | "sla_warning" | "sla_breach"

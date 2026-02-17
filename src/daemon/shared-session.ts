@@ -22,9 +22,8 @@ const STALE_THRESHOLD_MS = 90_000;
 export class SharedSessionManager {
   private sessions = new Map<string, SharedSession>();
   private updates = new Map<string, SessionUpdate[]>();
-  private readCursors = new Map<string, number>(); // key: `${sessionId}:${account}`
+  private readCursors = new Map<string, number>();
 
-  /** C1: Check if an account is a member (initiator or participant) of a session */
   isMember(sessionId: string, account: string): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
@@ -32,7 +31,6 @@ export class SharedSessionManager {
   }
 
   createSession(initiator: string, participant: string, workspace: string): SharedSession {
-    // M4: Prevent creating a session with yourself
     if (initiator === participant) {
       throw new Error("Cannot create session with yourself");
     }
@@ -60,11 +58,9 @@ export class SharedSessionManager {
     return true;
   }
 
-  /** M2: addUpdate now verifies sender membership. Returns boolean indicating success. */
   addUpdate(sessionId: string, from: string, data: unknown): boolean {
     const session = this.sessions.get(sessionId);
     if (!session || !session.active) return false;
-    // M2: Verify sender is a member
     if (session.initiator !== from && session.participant !== from) return false;
     const updates = this.updates.get(sessionId);
     if (!updates) return false;
@@ -76,10 +72,8 @@ export class SharedSessionManager {
     return true;
   }
 
-  /** M3: getUpdates now verifies reader membership. Returns empty array for non-members. */
   getUpdates(sessionId: string, forAccount: string): SessionUpdate[] {
     const session = this.sessions.get(sessionId);
-    // M3: Verify reader is a member
     if (!session || (session.initiator !== forAccount && session.participant !== forAccount)) return [];
     const updates = this.updates.get(sessionId);
     if (!updates) return [];
@@ -90,21 +84,19 @@ export class SharedSessionManager {
     return unread;
   }
 
-  /** C3: recordPing now verifies account is a member before recording */
   recordPing(sessionId: string, account: string): boolean {
     const session = this.sessions.get(sessionId);
     if (!session || !session.active) return false;
-    // C3: Verify account is initiator or participant
+
     if (session.initiator !== account && session.participant !== account) return false;
     session.lastPing[account] = Date.now();
     return true;
   }
 
-  /** C2: endSession now verifies the requesting account is a member. Returns boolean. */
   endSession(sessionId: string, account: string): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
-    // C2: Verify account is initiator or participant
+
     if (session.initiator !== account && session.participant !== account) return false;
     session.active = false;
     return true;
@@ -114,7 +106,6 @@ export class SharedSessionManager {
     return this.sessions.get(sessionId) ?? null;
   }
 
-  /** M5: Returns ALL active sessions for an account (not just the first). */
   getActiveSessionsForAccount(account: string): SharedSession[] {
     const results: SharedSession[] = [];
     for (const session of this.sessions.values()) {
@@ -142,7 +133,6 @@ export class SharedSessionManager {
     }
   }
 
-  /** M1: Purge inactive sessions older than the specified threshold from all Maps */
   purgeInactive(olderThanMs: number): number {
     const now = Date.now();
     let purged = 0;
@@ -152,7 +142,7 @@ export class SharedSessionManager {
       if (now - startedAtMs > olderThanMs) {
         this.sessions.delete(id);
         this.updates.delete(id);
-        // Clean up read cursors for this session
+
         for (const key of this.readCursors.keys()) {
           if (key.startsWith(`${id}:`)) {
             this.readCursors.delete(key);

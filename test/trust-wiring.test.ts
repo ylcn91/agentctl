@@ -1,7 +1,3 @@
-/**
- * TrustStore wiring tests — verifies trust updates on accept/reject.
- * Uses real daemon server with real filesystem (no mock.module).
- */
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { startDaemon, stopDaemon } from "../src/daemon/server";
 import { createConnection, type Socket, type Server } from "net";
@@ -10,10 +6,6 @@ import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { DelegationEvent } from "../src/services/event-bus";
 import type { DaemonState } from "../src/daemon/state";
-
-// ---------------------------------------------------------------------------
-// Helpers (no mock.module)
-// ---------------------------------------------------------------------------
 
 let dirCounter = 0;
 function freshTestDir(): string {

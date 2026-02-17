@@ -101,9 +101,7 @@ describe("ProgressTracker", () => {
 
   describe("isStalled", () => {
     test("returns true when no report within threshold", () => {
-      // Insert a report with a timestamp 20 minutes ago
       const report = tracker.report({ taskId: "t1", agent: "alice", percent: 30, currentStep: "waiting" });
-      // Manually backdate the timestamp
       const history = tracker.getHistory("t1");
       history[0] = { ...history[0], timestamp: new Date(Date.now() - 20 * 60 * 1000).toISOString() };
 
@@ -113,7 +111,6 @@ describe("ProgressTracker", () => {
     test("returns false when recent report exists", () => {
       tracker.report({ taskId: "t1", agent: "alice", percent: 30, currentStep: "working" });
 
-      // Report just created, should not be stalled at 15 min threshold
       expect(tracker.isStalled("t1", 15)).toBe(false);
     });
 
@@ -124,11 +121,8 @@ describe("ProgressTracker", () => {
 
   describe("getBehindSchedule", () => {
     test("detects tasks behind schedule", () => {
-      // Insert a report and backdate the first report to simulate elapsed time
       tracker.report({ taskId: "t1", agent: "alice", percent: 20, currentStep: "slow" });
       const history = tracker.getHistory("t1");
-      // First report was 40 minutes ago → for a 60-min estimated duration,
-      // expectedPercent = (40/60)*100 ≈ 66.7%, actual = 20% → behind
       history[0] = { ...history[0], timestamp: new Date(Date.now() - 40 * 60 * 1000).toISOString() };
 
       const behind = tracker.getBehindSchedule(60);
@@ -139,7 +133,6 @@ describe("ProgressTracker", () => {
     });
 
     test("ignores tasks on track", () => {
-      // Report 10 minutes ago at 80% for a 60-min task → expected ~16.7%, actual 80% → on track
       tracker.report({ taskId: "t1", agent: "alice", percent: 80, currentStep: "almost done" });
       const history = tracker.getHistory("t1");
       history[0] = { ...history[0], timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString() };
@@ -159,7 +152,6 @@ describe("ProgressTracker", () => {
       expect(tracker.getLatest("t1")).toBeNull();
       expect(tracker.getHistory("t1")).toEqual([]);
       expect(tracker.getActiveTasks()).toEqual(["t2"]);
-      // t2 is unaffected
       expect(tracker.getLatest("t2")).not.toBeNull();
     });
   });

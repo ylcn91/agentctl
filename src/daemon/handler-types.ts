@@ -30,5 +30,6 @@ export interface DaemonFeatures {
   circuitBreaker?: boolean;
   cognitiveFriction?: boolean;
   entireMonitoring?: boolean;
+  streaming?: boolean;
   delegationDepth?: DelegationDepthConfig;
 }

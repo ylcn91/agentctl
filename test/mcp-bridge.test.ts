@@ -24,7 +24,6 @@ describe("MCP tools registration", () => {
       { capabilities: { tools: {} } }
     );
 
-    // Create a mock daemon socket function
     const mockSendToDaemon = async (msg: object) => {
       if ((msg as any).type === "send_message") {
         return { type: "result", delivered: true, queued: true };
@@ -38,7 +37,6 @@ describe("MCP tools registration", () => {
       return { type: "error", message: "unknown" };
     };
 
-    // Should not throw
     registerTools(mcpServer, mockSendToDaemon, "test-account");
   });
 });
@@ -60,7 +58,6 @@ describe("MCP tools return correct results", () => {
 
     registerTools(mcpServer, mockSendToDaemon, "test-account");
 
-    // Verify tools are registered by calling them through the mock
     const result = await mockSendToDaemon({ type: "send_message", to: "bob", content: "hello" });
     expect(result.delivered).toBe(true);
     expect(result.queued).toBe(true);
@@ -153,7 +150,6 @@ describe("daemon socket protocol", () => {
   });
 
   test("client can connect and authenticate with daemon", async () => {
-    // Set up a mock daemon that accepts auth
     const connected = new Promise<string>((resolve) => {
       mockDaemon = createServer((socket) => {
         socket.on("data", (data) => {
@@ -167,7 +163,6 @@ describe("daemon socket protocol", () => {
       mockDaemon.listen(TEST_SOCK);
     });
 
-    // Connect as client
     const client = createConnection(TEST_SOCK);
     await new Promise<void>((resolve) => client.once("connect", resolve));
     client.write(JSON.stringify({ type: "auth", account: "test", token: "tok123" }) + "\n");
@@ -198,18 +193,15 @@ describe("daemon socket protocol", () => {
     const client = createConnection(TEST_SOCK);
     await new Promise<void>((resolve) => client.once("connect", resolve));
 
-    // Auth
     client.write(JSON.stringify({ type: "auth", account: "sender", token: "t" }) + "\n");
     await new Promise<void>((resolve) => client.once("data", () => resolve()));
 
-    // Send message
     client.write(JSON.stringify({ type: "send_message", to: "receiver", content: "hello" }) + "\n");
     const sendResp = await new Promise<any>((resolve) => {
       client.once("data", (data) => resolve(JSON.parse(data.toString())));
     });
     expect(sendResp.queued).toBe(true);
 
-    // Read messages
     client.write(JSON.stringify({ type: "read_messages" }) + "\n");
     const readResp = await new Promise<any>((resolve) => {
       client.once("data", (data) => resolve(JSON.parse(data.toString())));

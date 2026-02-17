@@ -16,7 +16,6 @@ export function registerHandoffTools(server: McpServer, sendToDaemon: DaemonSend
       branch: z.string().optional().describe("Git branch for context"),
       projectDir: z.string().optional().describe("Project directory path"),
       notes: z.string().optional().describe("Additional notes or context"),
-      // Enriched task characteristics (Paper §2.2)
       complexity: z.enum(["low", "medium", "high", "critical"]).optional().describe("Task complexity level"),
       criticality: z.enum(["low", "medium", "high", "critical"]).optional().describe("How critical the task is"),
       uncertainty: z.enum(["low", "medium", "high"]).optional().describe("Level of uncertainty in requirements"),

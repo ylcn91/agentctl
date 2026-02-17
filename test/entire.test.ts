@@ -5,7 +5,6 @@ describe("entire integration", () => {
   test("detects if entire CLI is installed", async () => {
     const installed = await isEntireInstalled();
     expect(typeof installed).toBe("boolean");
-    // This test is environment-dependent - just verify it returns a boolean
   });
 
   test("parses checkpoint metadata JSON", () => {

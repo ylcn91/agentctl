@@ -15,8 +15,6 @@ import type { EntireSessionMetrics } from "../src/services/entire-adapter";
 import type { Task } from "../src/services/tasks";
 import type { TaskCharacteristics } from "../src/services/event-bus";
 
-// --- Helpers ---
-
 function makeMetrics(overrides: Partial<EntireSessionMetrics> = {}): EntireSessionMetrics {
   return {
     sessionId: "sess-1",
@@ -63,8 +61,6 @@ function makeTrigger(overrides: Partial<EntireTrigger> = {}): EntireTrigger {
   };
 }
 
-// --- detectEntireTriggers ---
-
 describe("detectEntireTriggers", () => {
   const now = Date.now();
 
@@ -88,14 +84,14 @@ describe("detectEntireTriggers", () => {
   });
 
   test("detects no_checkpoint after 10 minutes", () => {
-    const lastCheckpoint = now - 11 * 60_000; // 11 minutes ago
+    const lastCheckpoint = now - 11 * 60_000;
     const metrics = makeMetrics();
     const triggers = detectEntireTriggers(metrics, "task-1", 0, lastCheckpoint, now);
     expect(triggers.some((t) => t.type === "no_checkpoint")).toBe(true);
   });
 
   test("does NOT trigger no_checkpoint within 10 minutes", () => {
-    const lastCheckpoint = now - 9 * 60_000; // 9 minutes ago
+    const lastCheckpoint = now - 9 * 60_000;
     const metrics = makeMetrics();
     const triggers = detectEntireTriggers(metrics, "task-1", 0, lastCheckpoint, now);
     expect(triggers.some((t) => t.type === "no_checkpoint")).toBe(false);
@@ -134,7 +130,7 @@ describe("detectEntireTriggers", () => {
       phase: "ended",
     });
     const triggers = detectEntireTriggers(metrics, "task-1", 500, lastCheckpoint, now);
-    expect(triggers.length).toBe(4); // all four triggers
+    expect(triggers.length).toBe(4);
     const types = triggers.map((t) => t.type);
     expect(types).toContain("token_burn_rate");
     expect(types).toContain("no_checkpoint");
@@ -156,16 +152,11 @@ describe("detectEntireTriggers", () => {
       contextSaturation: 0.6,
     });
     const triggers = detectEntireTriggers(metrics, "task-1", 500, lastCheckpoint, now, customConfig);
-    // burn rate 1200 < 500*3=1500 → no trigger
     expect(triggers.some((t) => t.type === "token_burn_rate")).toBe(false);
-    // 6 min > 5 min → trigger
     expect(triggers.some((t) => t.type === "no_checkpoint")).toBe(true);
-    // 0.6 > 0.5 → trigger
     expect(triggers.some((t) => t.type === "context_saturation")).toBe(true);
   });
 });
-
-// --- determineAction ---
 
 describe("determineAction", () => {
   test("returns ping for token_burn_rate trigger", () => {
@@ -215,20 +206,18 @@ describe("determineAction", () => {
 
   test("returns terminate when agent unresponsive for 2x threshold", () => {
     const trigger = makeTrigger({ type: "no_checkpoint" });
-    const thresholdMs = 10 * 60_000; // 10 min
-    const unresponsiveSince = Date.now() - 25 * 60_000; // 25 min ago (> 2*10)
+    const thresholdMs = 10 * 60_000;
+    const unresponsiveSince = Date.now() - 25 * 60_000;
     expect(determineAction(trigger, undefined, unresponsiveSince, thresholdMs)).toBe("terminate");
   });
 
   test("does NOT terminate when agent unresponsive for less than 2x threshold", () => {
     const trigger = makeTrigger({ type: "no_checkpoint" });
     const thresholdMs = 10 * 60_000;
-    const unresponsiveSince = Date.now() - 15 * 60_000; // 15 min (< 2*10=20)
+    const unresponsiveSince = Date.now() - 15 * 60_000;
     expect(determineAction(trigger, undefined, unresponsiveSince, thresholdMs)).not.toBe("terminate");
   });
 });
-
-// --- Cooldown tracking ---
 
 describe("cooldown tracking", () => {
   beforeEach(() => {
@@ -260,8 +249,6 @@ describe("cooldown tracking", () => {
     expect(isCoolingDown("task-2", now + 1000, 15 * 60_000)).toBe(false);
   });
 });
-
-// --- AdaptiveSLAEngine ---
 
 describe("AdaptiveSLAEngine", () => {
   beforeEach(() => {
@@ -371,15 +358,12 @@ describe("AdaptiveSLAEngine", () => {
     const engine = new AdaptiveSLAEngine({ entireAdapter: mockAdapter });
     const tasks = [makeTask()];
 
-    // First check — should produce escalation
     const first = engine.checkAdaptiveTasks(tasks, true, now);
     expect(first.length).toBeGreaterThan(0);
 
-    // Second check within cooldown — should be skipped
     const second = engine.checkAdaptiveTasks(tasks, true, now + 5 * 60_000);
     expect(second.length).toBe(0);
 
-    // Third check after cooldown expires — should produce escalation again
     const third = engine.checkAdaptiveTasks(tasks, true, now + 20 * 60_000);
     expect(third.length).toBeGreaterThan(0);
   });
@@ -419,7 +403,6 @@ describe("AdaptiveSLAEngine", () => {
       getLinkedTaskId: () => "task-1",
     } as any;
     const engine = new AdaptiveSLAEngine({ entireAdapter: mockAdapter });
-    // Mark agent as unresponsive for 25 min (> 2x 10 min threshold)
     engine.markUnresponsive("task-1", now - 25 * 60_000);
     const tasks = [makeTask()];
     const result = engine.checkAdaptiveTasks(tasks, true, now);
@@ -434,7 +417,6 @@ describe("AdaptiveSLAEngine", () => {
       getLinkedTaskId: () => "task-1",
     } as any;
     const engine = new AdaptiveSLAEngine({ entireAdapter: mockAdapter });
-    // Mark as unresponsive for 15 min (< 2x 10 min = 20 min)
     engine.markUnresponsive("task-1", now - 15 * 60_000);
     const tasks = [makeTask()];
     const result = engine.checkAdaptiveTasks(tasks, true, now);

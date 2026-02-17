@@ -1,4 +1,3 @@
-// Provider-Aware Routing: provider profiles with strengths and context windows
 
 export interface ProviderProfile {
   id: string;
@@ -46,29 +45,19 @@ const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
   },
 };
 
-/**
- * Get a provider profile by ID.
- */
 export function getProviderProfile(providerId: string): ProviderProfile | undefined {
   return PROVIDER_PROFILES[providerId];
 }
 
-/**
- * Calculate how well a provider fits the required skills.
- * Returns a score from 0-100 based on skill overlap.
- */
 export function calculateProviderFit(providerId: string, requiredSkills: string[]): number {
   const profile = PROVIDER_PROFILES[providerId];
   if (!profile) return 0;
-  if (requiredSkills.length === 0) return 50; // neutral when no skills specified
+  if (requiredSkills.length === 0) return 50;
 
   const matching = requiredSkills.filter((s) => profile.strengths.includes(s)).length;
   return Math.round((matching / requiredSkills.length) * 100);
 }
 
-/**
- * Get all registered provider profile IDs.
- */
 export function getAllProviderIds(): string[] {
   return Object.keys(PROVIDER_PROFILES);
 }

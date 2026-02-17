@@ -34,6 +34,7 @@ export interface FeatureFlags {
   circuitBreaker?: boolean;
   cognitiveFriction?: boolean;
   entireMonitoring?: boolean;
+  streaming?: boolean;
 }
 
 export interface GitHubConfig {
@@ -48,7 +49,6 @@ export interface CouncilConfig {
   timeoutMs?: number;
 }
 
-// Council analysis result types
 export interface CouncilResponse {
   account: string;
   complexity: "low" | "medium" | "high" | "critical";
@@ -111,7 +111,6 @@ export const DEFAULT_CONFIG: HubConfig = {
   },
 };
 
-// TDD workflow types
 export type TddPhase = "idle" | "red" | "green" | "refactor";
 
 export interface TddCycleEvent {
@@ -133,14 +132,12 @@ export interface TddState {
   startedAt: string;
 }
 
-// Re-export path functions from the consolidated paths module
 export {
   getHubDir, getSockPath, getPidPath, getTokensDir, getConfigPath,
   getMessagesDbPath, getWorkspacesDbPath, getCapabilitiesDbPath,
   getDaemonLogPath, getTasksPath,
 } from "./paths";
 
-// Backward-compatible const aliases (computed once on import via the paths module)
 import {
   getHubDir as _getHubDir, getConfigPath as _getConfigPath,
   getTokensDir as _getTokensDir, getTasksPath as _getTasksPath,

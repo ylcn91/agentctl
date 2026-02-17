@@ -1,5 +1,3 @@
-// Council analysis/verification persistence layer
-// Stores results so CouncilPanel.tsx can display history
 
 import { atomicRead, acquireLock } from "./file-store";
 import { getHubDir } from "../paths";
@@ -7,9 +5,11 @@ import { mkdir, rename, writeFile, unlink } from "node:fs/promises";
 import { dirname } from "path";
 import type { CouncilAnalysis } from "./council";
 import type { VerificationResult } from "./verification-council";
+import type { DiscussionResult } from "./council-discussion";
 
 const MAX_ANALYSES = 50;
 const MAX_VERIFICATIONS = 100;
+const MAX_DISCUSSIONS = 50;
 
 export interface CouncilCache {
   analyses: CouncilAnalysis[];
@@ -93,6 +93,39 @@ export async function appendVerificationResult(
       cache.verifications.unshift(result);
       if (cache.verifications.length > MAX_VERIFICATIONS) {
         cache.verifications = cache.verifications.slice(0, MAX_VERIFICATIONS);
+      }
+    },
+  );
+}
+
+export interface DiscussionCache {
+  discussions: DiscussionResult[];
+}
+
+export function getDiscussionCachePath(baseDir?: string): string {
+  return `${baseDir ?? getHubDir()}/council-discussions.json`;
+}
+
+export async function loadDiscussionCache(baseDir?: string): Promise<DiscussionCache> {
+  const cache = await atomicRead<DiscussionCache>(getDiscussionCachePath(baseDir));
+  if (cache && Array.isArray(cache.discussions)) {
+    return cache;
+  }
+  return { discussions: [] };
+}
+
+export async function appendDiscussionResult(
+  result: DiscussionResult,
+  baseDir?: string,
+): Promise<void> {
+  const path = getDiscussionCachePath(baseDir);
+  await lockedReadWriteJson<DiscussionCache>(
+    path,
+    () => loadDiscussionCache(baseDir),
+    (cache) => {
+      cache.discussions.unshift(result);
+      if (cache.discussions.length > MAX_DISCUSSIONS) {
+        cache.discussions = cache.discussions.slice(0, MAX_DISCUSSIONS);
       }
     },
   );

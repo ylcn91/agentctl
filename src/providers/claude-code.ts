@@ -96,7 +96,7 @@ export class ClaudeCodeProvider implements AgentProvider {
         try {
           const file = Bun.file(statsPath);
           if (!(await file.exists())) {
-            // Also try the standard name
+
             const altFile = Bun.file(`${account.configDir}/stats-cache.json`);
             if (!(await altFile.exists())) return EMPTY_RAW;
             const raw = (await altFile.json()) as any;
@@ -116,7 +116,7 @@ export class ClaudeCodeProvider implements AgentProvider {
   ): QuotaPolicy {
     const plan = overrides?.plan ?? "max-5x";
     const limit = overrides?.estimatedLimit ?? 225;
-    const windowMs = 5 * 60 * 60 * 1000; // 5 hours
+    const windowMs = 5 * 60 * 60 * 1000;
     return makeRollingWindowPolicy(windowMs, plan, limit);
   }
 

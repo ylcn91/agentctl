@@ -52,7 +52,6 @@ describe("prompt library", () => {
     expect(prompt!.title).toBe("Code Review");
     expect(prompt!.usageCount).toBe(1);
 
-    // Get again — count should be 2
     const prompt2 = await getPrompt(savedId);
     expect(prompt2!.usageCount).toBe(2);
   });

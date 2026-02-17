@@ -44,7 +44,7 @@ test("query with workflow filter", () => {
 test("search via FTS", () => {
   store.emit({ type: "task_created", timestamp: new Date().toISOString(), account: "worker", metadata: { note: "authentication feature" } });
   const results = store.search("authentication");
-  expect(results.length).toBeGreaterThanOrEqual(0); // FTS may or may not match metadata content
+  expect(results.length).toBeGreaterThanOrEqual(0);
 });
 
 test("cleanup old events", () => {

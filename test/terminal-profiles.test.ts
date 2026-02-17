@@ -52,7 +52,6 @@ describe("Terminal profiles", () => {
       const src = await Bun.file(
         new URL("../src/terminals/registry.ts", import.meta.url).pathname
       ).text();
-      // Must use Bun.spawn for mdfind and which, not Bun.$``
       expect(src).toContain('Bun.spawn(');
       expect(src).toContain('"mdfind"');
       expect(src).toContain('"which"');
@@ -61,7 +60,6 @@ describe("Terminal profiles", () => {
 
     test("terminal IDs with shell metacharacters are safe in argument arrays", () => {
       const reg = createDefaultTerminalRegistry();
-      // Register a terminal with a dangerous ID
       const dangerousIds = [
         '$(whoami)',
         '`rm -rf /`',
@@ -69,8 +67,6 @@ describe("Terminal profiles", () => {
         'foo && cat /etc/passwd',
       ];
       for (const id of dangerousIds) {
-        // Since detectDefault passes terminal.id as an argument array element to Bun.spawn,
-        // shell metacharacters are never interpreted. Verify registration works.
         expect(() => {
           reg.register({
             id,

@@ -1,8 +1,8 @@
-// F-02: Standardized Observability Event Taxonomy
-// Paper ref: Section 4.5 (Monitoring) — standardized observability events
 
 import type { VerificationReceipt } from "./verification-receipts";
 export type { VerificationReceipt };
+
+export type StreamChunkType = "text" | "thinking" | "tool_use" | "tool_result" | "error" | "system";
 
 export interface TaskCharacteristics {
   complexity?: "low" | "medium" | "high" | "critical";
@@ -20,7 +20,6 @@ export interface ProgressData {
   artifactsProduced?: string[];
 }
 
-// Discriminated union of all delegation lifecycle events
 export type DelegationEvent =
   | { type: "TASK_CREATED"; taskId: string; delegator: string; characteristics?: TaskCharacteristics }
   | { type: "TASK_ASSIGNED"; taskId: string; delegator: string; delegatee: string; reason: string }
@@ -38,7 +37,36 @@ export type DelegationEvent =
   | { type: "TDD_CYCLE_START"; testFile: string; phase: "red" | "green" | "refactor" }
   | { type: "TDD_TEST_PASS"; testFile: string; passCount: number; duration: number }
   | { type: "TDD_TEST_FAIL"; testFile: string; failCount: number; duration: number }
-  | { type: "TDD_REFACTOR"; testFile: string };
+  | { type: "TDD_REFACTOR"; testFile: string }
+  | { type: "TDD_TEST_OUTPUT"; testFile: string; line: string; stream: "stdout" | "stderr" }
+  | { type: "AGENT_STREAM_START"; sessionId: string; account: string; provider: string; prompt?: string }
+  | { type: "AGENT_STREAM_CHUNK"; sessionId: string; account: string; chunkType: StreamChunkType; content: string; toolName?: string; toolInput?: string }
+  | { type: "AGENT_STREAM_END"; sessionId: string; account: string; durationMs: number; tokenCount?: number; cost?: number }
+  | { type: "COUNCIL_SESSION_START"; councilSessionId: string; goal: string; stage: string; members: string[] }
+  | { type: "COUNCIL_STAGE_START"; councilSessionId: string; stage: string }
+  | { type: "COUNCIL_STAGE_COMPLETE"; councilSessionId: string; stage: string; results: unknown }
+  | { type: "COUNCIL_MEMBER_RESPONSE"; councilSessionId: string; account: string; stage: string; content: string; role: "member" | "chairman" }
+  | { type: "COUNCIL_SESSION_END"; councilSessionId: string; verdict?: string; confidence?: number }
+  | { type: "COUNCIL_DISCUSSION_START"; sessionId: string; goal: string; members: string[]; chairman: string }
+  | { type: "COUNCIL_RESEARCH_START"; sessionId: string; account: string }
+  | { type: "COUNCIL_RESEARCH_DONE"; sessionId: string; account: string; toolCount: number }
+  | { type: "COUNCIL_DISCUSSION_ROUND"; sessionId: string; round: number; account: string }
+  | { type: "COUNCIL_DECISION_START"; sessionId: string; chairman: string }
+  | { type: "COUNCIL_DISCUSSION_END"; sessionId: string }
+  | { type: "TASK_ESCALATED"; taskId: string; rejectionCount: number; reason: string }
+  | { type: "CIRCUIT_BREAKER_OPEN"; agent: string; trigger: string; reason: string; revokedTaskIds: string[] }
+  | { type: "CIRCUIT_BREAKER_CLOSED"; agent: string }
+  | { type: "ACCOUNT_HEALTH"; agent: string; status: "healthy" | "degraded" | "critical"; latencyMs?: number }
+  | { type: "DELEGATION_START"; delegationId: string; from: string; to: string; instruction: string; depth: number }
+  | { type: "DELEGATION_CHUNK"; delegationId: string; from: string; to: string; chunkType: StreamChunkType; content: string }
+  | { type: "DELEGATION_END"; delegationId: string; from: string; to: string; durationMs: number; success: boolean; toolCallCount: number }
+  | { type: "WORKFLOW_STEP_STARTED"; runId: string; stepId: string; assignee: string; workflowName: string }
+  | { type: "WORKFLOW_STEP_PROGRESS"; runId: string; stepId: string; assignee: string; detail: string }
+  | { type: "WORKFLOW_STEP_COMPLETED"; runId: string; stepId: string; result: string; durationMs: number }
+  | { type: "WORKFLOW_STEP_FAILED"; runId: string; stepId: string; error: string; attempt: number; willRetry: boolean }
+  | { type: "WORKFLOW_STARTED"; runId: string; workflowName: string; stepCount: number }
+  | { type: "WORKFLOW_COMPLETED"; runId: string; workflowName: string; durationMs: number; status: string }
+  | { type: "WORKFLOW_CANCELLED"; runId: string };
 
 export type DelegationEventType = DelegationEvent["type"];
 
@@ -62,7 +90,6 @@ export class EventBus {
       this.recentEvents.shift();
     }
 
-    // Notify type-specific subscribers
     const typeHandlers = this.handlers.get(event.type);
     if (typeHandlers) {
       for (const handler of typeHandlers) {
@@ -72,7 +99,6 @@ export class EventBus {
       }
     }
 
-    // Notify wildcard subscribers
     const wildcardHandlers = this.handlers.get("*");
     if (wildcardHandlers) {
       for (const handler of wildcardHandlers) {
@@ -91,7 +117,6 @@ export class EventBus {
     }
     this.handlers.get(eventType)!.add(handler);
 
-    // Return unsubscribe function
     return () => {
       this.handlers.get(eventType)?.delete(handler);
     };

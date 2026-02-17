@@ -95,7 +95,6 @@ describe("WorkspaceManager", () => {
   test("recoverStaleWorkspaces marks preparing as failed", async () => {
     const mgr = new WorkspaceManager(store, successGit);
 
-    // Manually create a "preparing" workspace (simulating a stale state)
     const now = new Date().toISOString();
     store.create({
       id: "stale-1",

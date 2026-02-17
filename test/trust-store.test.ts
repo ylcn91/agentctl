@@ -239,7 +239,6 @@ describe("TrustStore", () => {
       completionRate: 1,
       averageCompletionMinutes: 20,
     }));
-    // New task: 10 minutes. New avg = (20*4 + 10)/5 = 18
     store.recordOutcome("bob", "completed", 10);
 
     const updated = store.get("bob")!;

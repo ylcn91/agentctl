@@ -143,9 +143,9 @@ describe("checkStaleTasks", () => {
 
   test("custom SLA config with shorter thresholds triggers escalation sooner", () => {
     const shortConfig: SLAConfig = {
-      inProgressMaxMs: 5 * 60 * 1000,   // 5 min
-      blockedMaxMs: 3 * 60 * 1000,      // 3 min
-      reviewMaxMs: 2 * 60 * 1000,       // 2 min
+      inProgressMaxMs: 5 * 60 * 1000,
+      blockedMaxMs: 3 * 60 * 1000,
+      reviewMaxMs: 2 * 60 * 1000,
       checkIntervalMs: 30 * 1000,
     };
     const task = makeTask({
@@ -154,12 +154,10 @@ describe("checkStaleTasks", () => {
       status: "in_progress",
       events: [makeEvent("in_progress", 7, now)],
     });
-    // 7 min > 5 min threshold → ping
     const result = checkStaleTasks([task], shortConfig, now);
     expect(result).toHaveLength(1);
     expect(result[0].action).toBe("ping");
 
-    // Same task with default config → no escalation (7 < 30)
     const defaultResult = checkStaleTasks([task], DEFAULT_SLA_CONFIG, now);
     expect(defaultResult).toHaveLength(0);
   });

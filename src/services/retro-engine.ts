@@ -38,7 +38,7 @@ export interface RetroDocument {
 
 export class RetroEngine {
   private collectionTimeouts = new Map<string, Timer>();
-  private readonly COLLECTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+  private readonly COLLECTION_TIMEOUT_MS = 5 * 60 * 1000;
   private entireAdapter?: EntireAdapter;
   private entireMonitoringEnabled: boolean;
 
@@ -56,16 +56,13 @@ export class RetroEngine {
     const selectedChairman = chairman ?? participants[0];
     const session = this.store.createSession(workflowRunId, participants, selectedChairman);
 
-    // Query timeline from activityStore
     this.activityStore?.getByWorkflow(workflowRunId);
 
-    // Set collection timeout
     const timer = setTimeout(() => {
       this.handleCollectionTimeout(session.id);
     }, this.COLLECTION_TIMEOUT_MS);
     this.collectionTimeouts.set(session.id, timer);
 
-    // Emit retro_started activity event
     this.activityStore?.emit({
       type: "retro_started",
       timestamp: new Date().toISOString(),
@@ -119,7 +116,6 @@ export class RetroEngine {
       allSuggestions.push(...review.suggestions);
     }
 
-    // Deduplicate suggestions (case-insensitive)
     const seen = new Set<string>();
     const topSuggestions: string[] = [];
     for (const suggestion of allSuggestions) {
@@ -139,7 +135,6 @@ export class RetroEngine {
   async completeSynthesis(retroId: string, document: RetroDocument): Promise<void> {
     this.store.storeDocument(retroId, JSON.stringify(document), document.generatedBy);
 
-    // Meta-learning: index retro document in knowledge store
     if (this.knowledgeStore) {
       try {
         const learnings = [
@@ -155,13 +150,12 @@ export class RetroEngine {
           sourceId: retroId,
         });
       } catch {
-        // Best-effort meta-learning
+
       }
     }
 
     this.store.updateSessionStatus(retroId, "complete", new Date().toISOString());
 
-    // Emit retro_completed activity event
     const session = this.store.getSession(retroId);
     this.activityStore?.emit({
       type: "retro_completed",
@@ -192,10 +186,6 @@ export class RetroEngine {
     return JSON.parse(raw.content);
   }
 
-  /**
-   * Collect objective metrics from entire.io sessions linked to a workflow run.
-   * Feature gated: only runs when entireMonitoringEnabled is true and an adapter is set.
-   */
   collectEntireEvidence(_workflowRunId: string, participantSessionMap: Map<string, string>): EntireRetroEvidence[] {
     if (!this.entireMonitoringEnabled || !this.entireAdapter) {
       return [];

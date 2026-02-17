@@ -32,7 +32,6 @@ describe("trust-aware scoreAccount", () => {
     const lowResult = scoreAccount(lowTrust, ["typescript"]);
 
     expect(highResult.score).toBeGreaterThan(lowResult.score);
-    // Check trust reason is present
     const highTrustReason = highResult.reasons.find((r) => r.includes("trust:"));
     const lowTrustReason = lowResult.reasons.find((r) => r.includes("trust:"));
     expect(highTrustReason).toBeDefined();
@@ -90,13 +89,11 @@ describe("trust-aware rankAccounts", () => {
   });
 
   test("trust enrichment from TrustStore integrates with capabilities", () => {
-    // Simulate what the suggest_assignee handler does
     const caps = [
       makeCapability({ accountName: "alice" }),
       makeCapability({ accountName: "bob" }),
     ];
 
-    // Simulate trust enrichment
     const trustScores: Record<string, number> = {
       alice: 85,
       bob: 30,
@@ -109,7 +106,6 @@ describe("trust-aware rankAccounts", () => {
     }
 
     const ranked = rankAccounts(caps, ["typescript"]);
-    // Alice should rank higher due to better trust
     expect(ranked[0].accountName).toBe("alice");
   });
 });
@@ -172,7 +168,6 @@ describe("providerType in CapabilityStore", () => {
       providerType: "claude-code",
     }));
 
-    // Update with new provider type
     store.upsert(makeCapability({
       accountName: "alice",
       providerType: "gemini-cli",
@@ -196,14 +191,11 @@ describe("provider-aware scoring", () => {
       skills: ["typescript", "refactoring"],
     });
 
-    // Score with skills that match claude-code's strengths
     const claudeScore = scoreAccount(claudeAgent, ["typescript", "refactoring"]);
     const genericScore = scoreAccount(genericAgent, ["typescript", "refactoring"]);
 
-    // Claude agent should score higher due to provider fit
     expect(claudeScore.score).toBeGreaterThan(genericScore.score);
 
-    // Check provider fit reason present
     const claudeFit = claudeScore.reasons.find((r) => r.includes("provider fit:"));
     expect(claudeFit).toBeDefined();
     expect(claudeFit).toContain("strengths");
@@ -216,12 +208,9 @@ describe("provider-aware scoring", () => {
       skills: ["typescript", "testing"],
     });
 
-    // Gemini-cli strengths are: python, data-analysis, research, documentation, multimodal
-    // Requesting typescript skills should not match gemini strengths
     const score = scoreAccount(pythonAgent, ["typescript", "testing"]);
     const fitReason = score.reasons.find((r) => r.includes("provider fit:"));
     expect(fitReason).toBeDefined();
-    // 0 of 2 strengths match
     expect(fitReason).toContain("0/2");
   });
 });
@@ -244,7 +233,6 @@ describe("end-to-end trust + capability + provider integration", () => {
   });
 
   test("suggest_assignee flow: enriches capabilities with trust before ranking", () => {
-    // Set up capability data
     capStore.upsert(makeCapability({
       accountName: "alice",
       skills: ["typescript", "testing"],
@@ -256,7 +244,6 @@ describe("end-to-end trust + capability + provider integration", () => {
       providerType: "codex-cli",
     }));
 
-    // Set up trust data
     trustStore.recordOutcome("alice", "completed", 10);
     trustStore.recordOutcome("alice", "completed", 8);
     trustStore.recordOutcome("alice", "completed", 12);
@@ -264,7 +251,6 @@ describe("end-to-end trust + capability + provider integration", () => {
     trustStore.recordOutcome("bob", "failed");
     trustStore.recordOutcome("bob", "rejected");
 
-    // Simulate the handler's enrichment logic
     const capabilities = capStore.getAll();
     for (const cap of capabilities) {
       const rep = trustStore.get(cap.accountName);
@@ -275,11 +261,9 @@ describe("end-to-end trust + capability + provider integration", () => {
 
     const ranked = rankAccounts(capabilities, ["typescript", "testing"]);
 
-    // Alice should rank higher: better trust, claude-code provider fit
     expect(ranked[0].accountName).toBe("alice");
     expect(ranked[1].accountName).toBe("bob");
 
-    // Both should have trust scores injected
     const aliceCap = capabilities.find((c) => c.accountName === "alice");
     const bobCap = capabilities.find((c) => c.accountName === "bob");
     expect(aliceCap!.trustScore).toBeDefined();

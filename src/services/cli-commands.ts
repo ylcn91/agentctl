@@ -97,7 +97,6 @@ export async function searchCommand(pattern: string): Promise<string> {
     return `No matches found for "${pattern}" across ${result.searchedDirs.length} directories.`;
   }
 
-  // Group results by account
   const grouped = new Map<string, typeof result.results>();
   for (const r of result.results) {
     const existing = grouped.get(r.account) ?? [];
@@ -128,13 +127,11 @@ export async function healthCommand(account?: string): Promise<string> {
 
   let statuses: import("../daemon/health-monitor.js").AccountHealth[];
 
-  // Prefer querying daemon when it's running
   if (existsSync(getSockPath())) {
     const { fetchHealthStatus } = await import("./health-loader.js");
     statuses = await fetchHealthStatus();
   }
 
-  // Fall back to local HealthMonitor when daemon is unavailable or returned nothing
   if (!statuses! || statuses!.length === 0) {
     const { HealthMonitor } = await import("../daemon/health-monitor.js");
     const config = await loadConfig();
@@ -194,7 +191,6 @@ export async function replayCommand(
   const { readCheckpoint } = await import("./entire-integration.js");
   const { buildTimeline } = await import("./replay.js");
 
-  // Read checkpoint once and pass transcript to buildTimeline to avoid double read
   const { metadata, transcript } = await readCheckpoint(repoPath, sessionId);
   if (!metadata) {
     return `Checkpoint '${sessionId}' not found in ${repoPath}`;

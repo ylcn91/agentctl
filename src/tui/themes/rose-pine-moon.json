@@ -1,0 +1,227 @@
+{
+  "defs": {
+    "moonBase": "#232136",
+    "moonSurface": "#2a273f",
+    "moonOverlay": "#393552",
+    "moonMuted": "#6e6a86",
+    "moonSubtle": "#908caa",
+    "moonText": "#e0def4",
+    "moonLove": "#eb6f92",
+    "moonGold": "#f6c177",
+    "moonRose": "#ea9a97",
+    "moonPine": "#3e8fb0",
+    "moonFoam": "#9ccfd8",
+    "moonIris": "#c4a7e7",
+    "moonHighlightLow": "#2a283e",
+    "moonHighlightMed": "#44415a",
+    "moonHighlightHigh": "#56526e",
+    "dawnBase": "#faf4ed",
+    "dawnSurface": "#fffaf3",
+    "dawnOverlay": "#f2e9e1",
+    "dawnMuted": "#9893a5",
+    "dawnSubtle": "#797593",
+    "dawnText": "#575279"
+  },
+  "theme": {
+    "primary": {
+      "dark": "moonFoam",
+      "light": "moonPine"
+    },
+    "secondary": {
+      "dark": "moonIris",
+      "light": "#907aa9"
+    },
+    "accent": {
+      "dark": "moonRose",
+      "light": "#d7827e"
+    },
+    "error": {
+      "dark": "moonLove",
+      "light": "#b4637a"
+    },
+    "warning": {
+      "dark": "moonGold",
+      "light": "#ea9d34"
+    },
+    "success": {
+      "dark": "moonPine",
+      "light": "#286983"
+    },
+    "info": {
+      "dark": "moonFoam",
+      "light": "#56949f"
+    },
+    "text": {
+      "dark": "moonText",
+      "light": "dawnText"
+    },
+    "textMuted": {
+      "dark": "moonMuted",
+      "light": "dawnMuted"
+    },
+    "background": {
+      "dark": "moonBase",
+      "light": "dawnBase"
+    },
+    "backgroundPanel": {
+      "dark": "moonSurface",
+      "light": "dawnSurface"
+    },
+    "backgroundElement": {
+      "dark": "moonOverlay",
+      "light": "dawnOverlay"
+    },
+    "border": {
+      "dark": "moonHighlightMed",
+      "light": "#dfdad9"
+    },
+    "borderActive": {
+      "dark": "moonFoam",
+      "light": "moonPine"
+    },
+    "borderSubtle": {
+      "dark": "moonHighlightLow",
+      "light": "#f4ede8"
+    },
+    "diffAdded": {
+      "dark": "moonPine",
+      "light": "#286983"
+    },
+    "diffRemoved": {
+      "dark": "moonLove",
+      "light": "#b4637a"
+    },
+    "diffContext": {
+      "dark": "moonMuted",
+      "light": "dawnMuted"
+    },
+    "diffHunkHeader": {
+      "dark": "moonIris",
+      "light": "#907aa9"
+    },
+    "diffHighlightAdded": {
+      "dark": "moonPine",
+      "light": "#286983"
+    },
+    "diffHighlightRemoved": {
+      "dark": "moonLove",
+      "light": "#b4637a"
+    },
+    "diffAddedBg": {
+      "dark": "#24303f",
+      "light": "#e5f2f3"
+    },
+    "diffRemovedBg": {
+      "dark": "#3f2430",
+      "light": "#fce5e8"
+    },
+    "diffContextBg": {
+      "dark": "moonSurface",
+      "light": "dawnSurface"
+    },
+    "diffLineNumber": {
+      "dark": "moonMuted",
+      "light": "dawnMuted"
+    },
+    "diffAddedLineNumberBg": {
+      "dark": "#24303f",
+      "light": "#e5f2f3"
+    },
+    "diffRemovedLineNumberBg": {
+      "dark": "#3f2430",
+      "light": "#fce5e8"
+    },
+    "markdownText": {
+      "dark": "moonText",
+      "light": "dawnText"
+    },
+    "markdownHeading": {
+      "dark": "moonIris",
+      "light": "#907aa9"
+    },
+    "markdownLink": {
+      "dark": "moonFoam",
+      "light": "moonPine"
+    },
+    "markdownLinkText": {
+      "dark": "moonRose",
+      "light": "#d7827e"
+    },
+    "markdownCode": {
+      "dark": "moonPine",
+      "light": "#286983"
+    },
+    "markdownBlockQuote": {
+      "dark": "moonMuted",
+      "light": "dawnMuted"
+    },
+    "markdownEmph": {
+      "dark": "moonGold",
+      "light": "#ea9d34"
+    },
+    "markdownStrong": {
+      "dark": "moonLove",
+      "light": "#b4637a"
+    },
+    "markdownHorizontalRule": {
+      "dark": "moonHighlightMed",
+      "light": "#dfdad9"
+    },
+    "markdownListItem": {
+      "dark": "moonFoam",
+      "light": "moonPine"
+    },
+    "markdownListEnumeration": {
+      "dark": "moonRose",
+      "light": "#d7827e"
+    },
+    "markdownImage": {
+      "dark": "moonFoam",
+      "light": "moonPine"
+    },
+    "markdownImageText": {
+      "dark": "moonRose",
+      "light": "#d7827e"
+    },
+    "markdownCodeBlock": {
+      "dark": "moonText",
+      "light": "dawnText"
+    },
+    "syntaxComment": {
+      "dark": "moonMuted",
+      "light": "dawnMuted"
+    },
+    "syntaxKeyword": {
+      "dark": "moonPine",
+      "light": "#286983"
+    },
+    "syntaxFunction": {
+      "dark": "moonRose",
+      "light": "#d7827e"
+    },
+    "syntaxVariable": {
+      "dark": "moonText",
+      "light": "dawnText"
+    },
+    "syntaxString": {
+      "dark": "moonGold",
+      "light": "#ea9d34"
+    },
+    "syntaxNumber": {
+      "dark": "moonIris",
+      "light": "#907aa9"
+    },
+    "syntaxType": {
+      "dark": "moonFoam",
+      "light": "#56949f"
+    },
+    "syntaxOperator": {
+      "dark": "moonSubtle",
+      "light": "dawnSubtle"
+    },
+    "syntaxPunctuation": {
+      "dark": "moonSubtle",
+      "light": "dawnSubtle"
+    }
+  }
+}

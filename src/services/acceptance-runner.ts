@@ -36,6 +36,49 @@ export function evaluateResults(results: RunResult[]): AcceptanceResult {
   };
 }
 
+export type LineCallback = (line: string, stream: "stdout" | "stderr") => void;
+
+export async function runAcceptanceSuiteStreaming(
+  commands: string[],
+  workDir: string,
+  onLine: LineCallback,
+  opts?: { timeoutMs?: number; signal?: AbortSignal },
+): Promise<AcceptanceResult> {
+  if (!existsSync(workDir)) throw new Error(`workDir does not exist: ${workDir}`);
+  if (commands.length === 0) return evaluateResults([]);
+
+  const timeoutMs = opts?.timeoutMs ?? 60_000;
+  const results: RunResult[] = [];
+
+  for (const command of commands) {
+    if (opts?.signal?.aborted) break;
+    const check = sanitizeShellCommand(command);
+    if (!check.safe) {
+      const reason = `Command rejected: ${check.reason}`;
+      onLine(reason, "stderr");
+      results.push({ command, exitCode: -2, stdout: "", stderr: reason, durationMs: 0 });
+      continue;
+    }
+    const start = Date.now();
+    const proc = Bun.spawn(["sh", "-c", check.command], { cwd: workDir, stdout: "pipe", stderr: "pipe" });
+    if (opts?.signal) opts.signal.addEventListener("abort", () => proc.kill(), { once: true });
+
+    const timer = setTimeout(() => proc.kill(), timeoutMs);
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+    await proc.exited;
+    clearTimeout(timer);
+
+    for (const line of stdout.split("\n").filter(Boolean)) onLine(line, "stdout");
+    for (const line of stderr.split("\n").filter(Boolean)) onLine(line, "stderr");
+
+    results.push({ command, exitCode: proc.exitCode ?? 1, stdout, stderr, durationMs: Date.now() - start });
+  }
+  return evaluateResults(results);
+}
+
 export async function runAcceptanceSuite(
   commands: string[],
   workDir: string,
@@ -53,7 +96,7 @@ export async function runAcceptanceSuite(
   const results: RunResult[] = [];
 
   for (const command of commands) {
-    // Validate command before execution
+
     const check = sanitizeShellCommand(command);
     if (!check.safe) {
       results.push({

@@ -1,14 +1,3 @@
-/**
- * MCP tool error injection tests.
- *
- * Verifies that MCP tools handle daemon errors gracefully:
- * - Connection timeout (sendToDaemon rejects with timeout error)
- * - Malformed JSON response (sendToDaemon returns unexpected shape)
- * - Daemon returning error type
- *
- * We directly test the tool handler functions by creating a minimal McpServer
- * and calling the registered handlers with a mocked sendToDaemon.
- */
 import { describe, test, expect } from "bun:test";
 import { registerMessagingTools } from "../src/mcp/tools/messaging";
 import { registerHealthTools } from "../src/mcp/tools/health";
@@ -16,7 +5,6 @@ import { registerWorkflowTools } from "../src/mcp/tools/workflow";
 import { registerSessionTools } from "../src/mcp/tools/sessions";
 import type { DaemonSender } from "../src/mcp/tools";
 
-// Minimal McpServer stub that captures registered tool handlers
 type ToolHandler = (args: any) => Promise<any>;
 
 class MockMcpServer {
@@ -25,8 +13,6 @@ class MockMcpServer {
   registerTool(name: string, _schema: any, handler: ToolHandler): void;
   registerTool(name: string, _schema: any, _opts: any, handler?: ToolHandler): void;
   registerTool(name: string, _schema: any, handlerOrOpts: any, maybeHandler?: ToolHandler): void {
-    // The MCP SDK registerTool signature: (name, description, handler)
-    // or (name, {description, inputSchema}, handler)
     const handler = typeof maybeHandler === "function" ? maybeHandler : handlerOrOpts;
     this.tools.set(name, handler);
   }
@@ -132,7 +118,6 @@ describe("MCP error injection: malformed/unexpected response shape", () => {
 
     const result = await server.callTool("read_messages", {});
     const parsed = JSON.parse(result.content[0].text);
-    // Should default to empty array via ?? []
     expect(parsed).toEqual([]);
   });
 
@@ -161,7 +146,6 @@ describe("MCP error injection: malformed/unexpected response shape", () => {
     const server = createMockServer();
     registerHealthTools(server as any, nullSender, "test-account");
 
-    // Should either return the null serialized or throw — not crash silently
     const result = await server.callTool("daemon_health");
     expect(result.content[0].text).toBeDefined();
   });

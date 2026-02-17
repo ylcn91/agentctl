@@ -4,21 +4,19 @@ import { createLineParser, generateRequestId, frameSend } from "../daemon/framin
 import { getHubDir, getSockPath } from "../paths";
 import { DAEMON_CLIENT_TIMEOUT_MS } from "../constants";
 
-
 async function getToken(account: string): Promise<string | null> {
   try {
     const file = Bun.file(`${getHubDir()}/tokens/${account}.token`);
     if (!(await file.exists())) return null;
     return (await file.text()).trim();
   } catch {
-    return null; /* token file missing or unreadable */
+    return null;
   }
 }
 
 async function socketExists(): Promise<boolean> {
   try {
-    // Bun.file().exists() only works for regular files, not Unix sockets.
-    // Use fs.access to detect socket existence.
+
     const { access } = await import("node:fs/promises");
     await access(getSockPath());
     return true;
@@ -47,7 +45,7 @@ export async function fetchUnreadMessages(account: string): Promise<DaemonMessag
 
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
-      try { socket.destroy(); } catch { /* socket already destroyed or errored */ }
+      try { socket.destroy(); } catch {  }
       resolve([]);
     }, DAEMON_CLIENT_TIMEOUT_MS);
 
@@ -103,7 +101,7 @@ export async function fetchUnreadCount(account: string): Promise<number> {
 
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
-      try { socket.destroy(); } catch { /* socket already destroyed or errored */ }
+      try { socket.destroy(); } catch {  }
       resolve(0);
     }, DAEMON_CLIENT_TIMEOUT_MS);
 
@@ -173,7 +171,7 @@ export async function fetchActiveSession(account: string): Promise<{ initiator: 
 
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
-      try { socket.destroy(); } catch { /* socket already destroyed or errored */ }
+      try { socket.destroy(); } catch {  }
       resolve(null);
     }, DAEMON_CLIENT_TIMEOUT_MS);
 

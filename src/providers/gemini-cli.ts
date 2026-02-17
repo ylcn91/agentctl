@@ -34,7 +34,7 @@ export class GeminiCliProvider implements AgentProvider {
   supportsEntire = false;
 
   async detectRunning(_account: Account): Promise<ProcessInfo | null> {
-    return null; // Not implemented for stub providers
+    return null;
   }
 
   buildLaunchCommand(account: Account, opts: LaunchOpts): string[] {
@@ -49,7 +49,7 @@ export class GeminiCliProvider implements AgentProvider {
     return {
       type: "filesystem",
       async read(): Promise<RawUsageData> {
-        // Gemini CLI has no standard stats file; return empty stub
+
         return EMPTY_RAW;
       },
     };
@@ -73,7 +73,7 @@ export class GeminiCliProvider implements AgentProvider {
     _statsPath: string,
     _referenceDate?: string
   ): Promise<AgentStats> {
-    // Gemini CLI has no standard stats file format
+
     return EMPTY_STATS;
   }
 

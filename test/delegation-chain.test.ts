@@ -27,7 +27,6 @@ describe("delegation chain enforcement", () => {
     });
 
     test("tracks depth through chain", () => {
-      // Simulate a chain: original -> depth 1 -> depth 2
       const depth0 = checkDelegationDepth({
         ...basePayload,
         delegation_depth: 0,
@@ -51,7 +50,6 @@ describe("delegation chain enforcement", () => {
       expect(depth2.currentDepth).toBe(2);
       expect(depth2.reason).toContain("Approaching");
 
-      // Depth 3 should be blocked
       const depth3 = checkDelegationDepth({
         ...basePayload,
         delegation_depth: computeNextDepth(2),

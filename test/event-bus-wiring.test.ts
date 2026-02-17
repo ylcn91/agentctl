@@ -1,7 +1,3 @@
-/**
- * EventBus wiring tests — verifies daemon handlers emit correct events.
- * Uses real daemon server with real filesystem (no mock.module).
- */
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { startDaemon, stopDaemon } from "../src/daemon/server";
 import { createConnection, type Socket, type Server } from "net";
@@ -10,10 +6,6 @@ import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { DelegationEvent } from "../src/services/event-bus";
 import type { DaemonState } from "../src/daemon/state";
-
-// ---------------------------------------------------------------------------
-// Helpers (no mock.module — real daemon, real filesystem)
-// ---------------------------------------------------------------------------
 
 let dirCounter = 0;
 function freshTestDir(): string {
@@ -164,10 +156,13 @@ describe("EventBus wiring in daemon handlers", () => {
     const acceptReply = await worker.send({ type: "handoff_accept", handoffId });
     expect(acceptReply.type).toBe("result");
 
-    expect(events).toHaveLength(1);
-    expect(events[0].type).toBe("TASK_ASSIGNED");
+    // handoff_task emits TASK_ASSIGNED (handoff_created), handoff_accept emits another (handoff_accepted)
+    expect(events).toHaveLength(2);
+    expect((events[0] as any).reason).toBe("handoff_created");
     expect((events[0] as any).delegatee).toBe("worker");
-    expect((events[0] as any).delegator).toBe("delegator");
+    expect((events[1] as any).reason).toBe("handoff_accepted");
+    expect((events[1] as any).delegatee).toBe("worker");
+    expect((events[1] as any).delegator).toBe("delegator");
 
     delegator.destroy();
     worker.destroy();

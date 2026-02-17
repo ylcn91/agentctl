@@ -13,7 +13,7 @@ export interface CollectedContext {
   truncated: boolean;
 }
 
-const MAX_CONTEXT_CHARS = 50 * 1024; // 50K character cap
+const MAX_CONTEXT_CHARS = 50 * 1024;
 
 export async function collectGitContext(workDir: string): Promise<GitContext> {
   const [branchResult, logResult, diffResult, statusResult] = await Promise.allSettled([
@@ -53,10 +53,8 @@ export async function collectContext(
   const size = JSON.stringify(git).length;
 
   if (size > maxChars) {
-    // Truncate diff first to fit within budget
     const TRUNCATION_SUFFIX = "\n... [diff truncated]";
     const overhead = size - git.diff.length;
-    // Subtract suffix length from budget so final output stays within maxChars
     const diffBudget = Math.max(0, maxChars - overhead - TRUNCATION_SUFFIX.length);
     if (diffBudget < git.diff.length) {
       git.diff = git.diff.slice(0, diffBudget) + TRUNCATION_SUFFIX;

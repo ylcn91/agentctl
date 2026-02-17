@@ -85,7 +85,6 @@ export async function loadConfig(path?: string): Promise<HubConfig> {
   const raw = await atomicRead<Record<string, unknown>>(configPath);
   if (!raw) return { ...DEFAULT_CONFIG };
 
-  // Tolerant parsing: use defaults for missing fields
   const rawEntire = raw.entire as Record<string, unknown> | undefined;
   const rawDefaults = raw.defaults as Record<string, unknown> | undefined;
   const assembled: HubConfig = {
@@ -109,7 +108,6 @@ export async function loadConfig(path?: string): Promise<HubConfig> {
     },
   };
 
-  // Validate with Zod; on failure, log warning and return defaults
   const result = HubConfigSchema.safeParse(assembled);
   if (!result.success) {
     console.warn("[config] Validation failed, using defaults:", result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
@@ -145,7 +143,7 @@ export async function setConfigValue(dotPath: string, value: string): Promise<{ 
   }
   const lastKey = keys[keys.length - 1];
   const oldValue = obj[lastKey];
-  // Try to parse value as number or boolean
+
   let parsed: any = value;
   if (value === "true") parsed = true;
   else if (value === "false") parsed = false;
@@ -165,10 +163,8 @@ export async function migrateConfig(
   const version = (raw.schemaVersion as number) ?? 0;
   if (version >= CURRENT_SCHEMA_VERSION) return { migrated: false, backupPath: null };
 
-  // Backup before migration
   const bp = await backupFile(configPath, version);
 
-  // Run migration chain (currently only v0 -> v1)
   let data = raw;
   if (version < 1) {
     data = { ...DEFAULT_CONFIG, ...data, schemaVersion: 1 };

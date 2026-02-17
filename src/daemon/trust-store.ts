@@ -1,7 +1,3 @@
-// F-03: Trust & Reputation Store
-// Paper ref: Section 4.6 (Trust and Reputation)
-// Key distinction: capability answers "can this agent do this?"
-// Trust answers "should I give this agent this task?"
 
 import { BaseStore } from "./base-store";
 
@@ -9,20 +5,15 @@ export type TrustLevel = "low" | "medium" | "high";
 
 export interface AgentReputation {
   accountName: string;
-  // Outcome metrics
   totalTasksCompleted: number;
   totalTasksFailed: number;
   totalTasksRejected: number;
   completionRate: number;
-  // SLA metrics
   slaComplianceRate: number;
   averageCompletionMinutes: number;
-  // Quality metrics
   qualityVariance: number;
   criticalFailureCount: number;
-  // Behavioral metrics
   progressReportingRate: number;
-  // Computed
   trustScore: number;
   trustLevel: TrustLevel;
   lastUpdated: string;
@@ -35,10 +26,8 @@ export function computeTrustLevel(score: number): TrustLevel {
 }
 
 export function computeTrustScore(rep: Omit<AgentReputation, "trustScore" | "trustLevel" | "lastUpdated">): number {
-  // Weighted composite: completion(35) + sla(25) + quality(20) + behavioral(10) + cold-start(10)
   const total = rep.totalTasksCompleted + rep.totalTasksFailed + rep.totalTasksRejected;
 
-  // Cold start: no history means neutral score
   if (total === 0) return 50;
 
   const completionScore = rep.completionRate * 35;
@@ -46,7 +35,6 @@ export function computeTrustScore(rep: Omit<AgentReputation, "trustScore" | "tru
   const qualityScore = Math.max(0, 20 - rep.criticalFailureCount * 5 - rep.qualityVariance * 10);
   const behavioralScore = rep.progressReportingRate * 10;
 
-  // Volume bonus: slight credit for agents with more history (max 10)
   const volumeBonus = Math.min(10, total * 0.5);
 
   return Math.max(0, Math.min(100, Math.round(
@@ -141,7 +129,6 @@ export class TrustStore extends BaseStore {
     current.completionRate = total > 0 ? current.totalTasksCompleted / total : 0;
 
     if (durationMinutes !== undefined && outcome === "completed") {
-      // Running average
       const prevTotal = current.totalTasksCompleted - 1;
       current.averageCompletionMinutes = prevTotal > 0
         ? (current.averageCompletionMinutes * prevTotal + durationMinutes) / current.totalTasksCompleted
@@ -153,7 +140,6 @@ export class TrustStore extends BaseStore {
     current.lastUpdated = now;
     this.upsert(current);
 
-    // Record history if score changed
     const delta = current.trustScore - oldScore;
     if (delta !== 0) {
       this.db.prepare(

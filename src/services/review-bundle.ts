@@ -32,7 +32,6 @@ export async function generateReviewBundle(opts: {
 }): Promise<ReviewBundle> {
   const baseBranch = opts.baseBranch ?? "main";
 
-  // Get diff stat summary
   const statProc = Bun.spawn(
     ["git", "diff", "--stat", `${baseBranch}...${opts.branch}`],
     { cwd: opts.workDir, stdout: "pipe", stderr: "pipe" },
@@ -44,7 +43,6 @@ export async function generateReviewBundle(opts: {
   }
   const summary = await new Response(statProc.stdout).text();
 
-  // Parse last line for stats
   let filesChanged = 0;
   let insertions = 0;
   let deletions = 0;
@@ -56,7 +54,6 @@ export async function generateReviewBundle(opts: {
   if (insMatch) insertions = parseInt(insMatch[1], 10);
   if (delMatch) deletions = parseInt(delMatch[1], 10);
 
-  // Get full diff, truncated
   const diffProc = Bun.spawn(
     ["git", "diff", `${baseBranch}...${opts.branch}`],
     { cwd: opts.workDir, stdout: "pipe", stderr: "pipe" },
@@ -72,7 +69,6 @@ export async function generateReviewBundle(opts: {
     fullDiff = fullDiff.slice(0, MAX_DIFF);
   }
 
-  // Run acceptance suite if commands provided
   let testResults: AcceptanceResult | undefined;
   if (opts.runCommands && opts.runCommands.length > 0) {
     testResults = await runAcceptanceSuite(opts.runCommands, opts.workDir);
@@ -99,7 +95,6 @@ export function analyzeRisks(diffStat: string, _fullDiff?: string): RiskNote[] {
   const risks: RiskNote[] = [];
   const lines = diffStat.trim().split("\n");
 
-  // Parse file names from diff stat lines (format: " path/to/file | N +--")
   const changedFiles: string[] = [];
   for (const line of lines) {
     const match = line.match(/^\s*(.+?)\s*\|/);
@@ -108,10 +103,9 @@ export function analyzeRisks(diffStat: string, _fullDiff?: string): RiskNote[] {
     }
   }
 
-  // config-change: files matching config extensions or containing .env
   for (const file of changedFiles) {
     if (/\.(json|yaml|yml|toml)$/.test(file) || file.includes(".env")) {
-      // Skip package.json — handled separately as new-dependency
+
       if (file === "package.json" || file.endsWith("/package.json")) continue;
       risks.push({
         category: "config-change",
@@ -121,7 +115,6 @@ export function analyzeRisks(diffStat: string, _fullDiff?: string): RiskNote[] {
     }
   }
 
-  // new-dependency: package.json or bun.lock changes
   for (const file of changedFiles) {
     if (
       file === "package.json" ||
@@ -137,7 +130,6 @@ export function analyzeRisks(diffStat: string, _fullDiff?: string): RiskNote[] {
     }
   }
 
-  // schema-change: .sql files or migration paths
   for (const file of changedFiles) {
     if (/\.sql$/.test(file) || /migration/i.test(file)) {
       risks.push({
@@ -148,7 +140,6 @@ export function analyzeRisks(diffStat: string, _fullDiff?: string): RiskNote[] {
     }
   }
 
-  // large-change: total lines changed
   const lastLine = diffStat.trim().split("\n").pop() ?? "";
   let totalLines = 0;
   const insMatch = lastLine.match(/(\d+)\s+insertions?\(\+\)/);
@@ -170,7 +161,6 @@ export function analyzeRisks(diffStat: string, _fullDiff?: string): RiskNote[] {
     });
   }
 
-  // test-gap: .ts files without corresponding .test.ts
   const tsFiles = changedFiles.filter(
     (f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.endsWith(".d.ts"),
   );

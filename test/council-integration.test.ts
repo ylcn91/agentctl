@@ -11,7 +11,6 @@ import {
   type HandoffPayloadForVerification,
 } from "../src/services/verification-council";
 
-// Realistic account names that look like real deployment accounts
 const REALISTIC_MEMBERS = ["claude-primary", "codex-review", "gemini-analysis"];
 const CHAIRMAN = "claude-primary";
 
@@ -77,21 +76,17 @@ describe("council full pipeline with realistic accounts", () => {
       "Production system with 50k active users, zero-downtime requirement",
     );
 
-    // All 3 members participated in stage 1
     const stage1Calls = callLog.filter((c) => c.stage === "stage1");
     expect(stage1Calls).toHaveLength(3);
     expect(stage1Calls.map((c) => c.account).sort()).toEqual(REALISTIC_MEMBERS.slice().sort());
 
-    // All 3 members participated in stage 2
     const stage2Calls = callLog.filter((c) => c.stage === "stage2");
     expect(stage2Calls).toHaveLength(3);
 
-    // Only chairman in stage 3
     const stage3Calls = callLog.filter((c) => c.stage === "stage3");
     expect(stage3Calls).toHaveLength(1);
     expect(stage3Calls[0].account).toBe(CHAIRMAN);
 
-    // Verify result
     expect(result.individualAnalyses).toHaveLength(3);
     expect(result.peerRankings).toHaveLength(3);
     expect(result.aggregateRankings).toHaveLength(3);
@@ -106,7 +101,7 @@ describe("council full pipeline with realistic accounts", () => {
           throw new Error("Rate limited — try again later");
         }
         if (account === "gemini-analysis") {
-          return "I cannot produce JSON output right now."; // unparseable
+          return "I cannot produce JSON output right now.";
         }
         return makeStage1Response();
       } else if (system.includes("peer reviewer")) {
@@ -124,12 +119,9 @@ describe("council full pipeline with realistic accounts", () => {
 
     const result = await service.analyze("Build a notification system");
 
-    // codex-review threw, gemini-analysis returned unparseable text
-    // Only claude-primary succeeded
     expect(result.individualAnalyses).toHaveLength(1);
     expect(result.individualAnalyses[0].account).toBe("claude-primary");
 
-    // Pipeline still completes
     expect(result.synthesis.chairman).toBe(CHAIRMAN);
   });
 });
@@ -160,12 +152,10 @@ describe("council peer review anonymization", () => {
     expect(capturedPrompts.length).toBeGreaterThan(0);
 
     for (const prompt of capturedPrompts) {
-      // Should contain anonymized labels
       expect(prompt).toContain("Analysis A");
       expect(prompt).toContain("Analysis B");
       expect(prompt).toContain("Analysis C");
 
-      // Should NOT contain account names
       for (const member of REALISTIC_MEMBERS) {
         expect(prompt).not.toContain(member);
       }
@@ -176,10 +166,6 @@ describe("council peer review anonymization", () => {
 describe("calculateAggregateRankings with ties", () => {
   test("tied average ranks produce same averageRank value", () => {
     const accounts = ["account-a", "account-b", "account-c"];
-    // Rankings where account-a and account-c tie:
-    // Reviewer 1: [0, 1, 2] => a=1, b=2, c=3
-    // Reviewer 2: [2, 1, 0] => c=1, b=2, a=3
-    // a avg = (1+3)/2 = 2, b avg = (2+2)/2 = 2, c avg = (3+1)/2 = 2
     const rankings = [
       { reviewer: "r1", ranking: [0, 1, 2], reasoning: "A is best" },
       { reviewer: "r2", ranking: [2, 1, 0], reasoning: "C is best" },
@@ -188,7 +174,6 @@ describe("calculateAggregateRankings with ties", () => {
     const aggregate = calculateAggregateRankings(rankings, accounts);
 
     expect(aggregate).toHaveLength(3);
-    // All three accounts should have the same average rank
     expect(aggregate[0].averageRank).toBe(2);
     expect(aggregate[1].averageRank).toBe(2);
     expect(aggregate[2].averageRank).toBe(2);
@@ -196,9 +181,6 @@ describe("calculateAggregateRankings with ties", () => {
 
   test("two-way tie with one clear winner", () => {
     const accounts = ["alpha", "beta", "gamma"];
-    // Reviewer 1: [0, 1, 2] => alpha=1, beta=2, gamma=3
-    // Reviewer 2: [0, 2, 1] => alpha=1, gamma=2, beta=3
-    // alpha avg = (1+1)/2 = 1, beta avg = (2+3)/2 = 2.5, gamma avg = (3+2)/2 = 2.5
     const rankings = [
       { reviewer: "r1", ranking: [0, 1, 2], reasoning: "ok" },
       { reviewer: "r2", ranking: [0, 2, 1], reasoning: "ok" },
@@ -209,7 +191,6 @@ describe("calculateAggregateRankings with ties", () => {
     expect(aggregate[0].account).toBe("alpha");
     expect(aggregate[0].averageRank).toBe(1);
 
-    // beta and gamma tied at 2.5
     const betaGamma = aggregate.slice(1);
     expect(betaGamma.every((a) => a.averageRank === 2.5)).toBe(true);
   });
@@ -337,7 +318,6 @@ describe("verification pipeline integration", () => {
         });
       }
       stage1CallCount++;
-      // Alternate between ACCEPT and REJECT verdicts
       if (stage1CallCount % 2 === 1) {
         return JSON.stringify({
           verdict: "ACCEPT",
@@ -367,7 +347,6 @@ describe("verification pipeline integration", () => {
     expect(result.confidence).toBe(0.7);
     expect(result.notes).toContain("Add integration tests before deploying to production");
 
-    // Verify we got mixed individual verdicts
     const verdicts = result.individualReviews.map((r) => r.verdict);
     expect(verdicts).toContain("ACCEPT");
     expect(verdicts).toContain("REJECT");
@@ -408,10 +387,8 @@ describe("verification pipeline integration", () => {
 
     expect(stage2Prompts.length).toBeGreaterThan(0);
     for (const prompt of stage2Prompts) {
-      // Anonymized labels should be present
       expect(prompt).toContain("Review A");
       expect(prompt).toContain("Review B");
-      // Account names should NOT appear in stage 2 prompts
       for (const name of memberNames) {
         expect(prompt).not.toContain(name);
       }
@@ -442,9 +419,7 @@ describe("verification pipeline integration", () => {
       { members: ["m"], chairman: "m", llmCaller: mockCaller },
     );
 
-    // Same handoff payload -> same specHash
     expect(r1.receipt.specHash).toBe(r2.receipt.specHash);
-    // Same review bundle -> same evidenceHash
     expect(r1.receipt.evidenceHash).toBe(r2.receipt.evidenceHash);
   });
 });

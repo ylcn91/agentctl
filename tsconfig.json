@@ -11,7 +11,11 @@
     "declaration": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["bun-types"]
+    "isolatedModules": true,
+    "types": ["bun-types"],
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "src/tui"]
 }

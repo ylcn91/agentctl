@@ -209,7 +209,6 @@ describe("computeWorktreePath", () => {
   });
 
   test("safe branch names with .. substring do not throw", () => {
-    // After slash replacement, "-.."/"..-foo" resolve inside base, so they are safe
     expect(computeWorktreePath("/repo", "-..")).toBe("/repo/.worktrees/-..");
     expect(computeWorktreePath("/repo", "../escape")).toBe("/repo/.worktrees/..-escape");
   });

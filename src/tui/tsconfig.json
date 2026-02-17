@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "preserve",
+    "jsxImportSource": "@opentui/solid",
+    "strict": true,
+    "outDir": "../../dist/tui",
+    "declaration": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "types": ["bun-types"],
+    "lib": ["ESNext"],
+    "resolveJsonModule": true,
+    "paths": {
+      "@tui/*": ["./*"]
+    }
+  },
+  "include": ["./**/*"],
+  "exclude": ["node_modules"]
+}

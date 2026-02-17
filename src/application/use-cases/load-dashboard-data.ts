@@ -50,14 +50,12 @@ export async function loadDashboardData(configPath?: string): Promise<DashboardD
     accounts.push({ account, stats, quota });
   }
 
-  // Rate limit notifications
   for (const item of accounts) {
     if (item.quota.percent >= 80) {
       notifyRateLimit(item.account.name).catch(e => console.error("[dash]", e.message));
     }
   }
 
-  // Entire checkpoints
   const repoDir = process.cwd();
   const entireStatuses = new Map<string, string>();
   try {
@@ -81,13 +79,11 @@ export async function loadDashboardData(configPath?: string): Promise<DashboardD
     }
   }
 
-  // Unread message counts
   let unreadCounts = new Map<string, number>();
   try {
     unreadCounts = await fetchUnreadCounts(config.accounts.map((a) => a.name));
   } catch(e: any) { console.error("[dash]", e.message) }
 
-  // Paired sessions
   let pairedSessions = new Map<string, string>();
   try {
     pairedSessions = await fetchPairedSessions(config.accounts.map((a) => a.name));

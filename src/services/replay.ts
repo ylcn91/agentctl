@@ -11,12 +11,6 @@ export interface ReplayEvent {
   index: number;
 }
 
-/**
- * Build a timeline of events from a checkpoint's full.jsonl transcript.
- * Parses each JSONL line and classifies it as prompt, response, or tool_call.
- *
- * Accepts optional pre-read transcript to avoid redundant readCheckpoint calls.
- */
 export async function buildTimeline(
   repoPath: string,
   checkpointId: string,
@@ -30,7 +24,6 @@ export async function buildTimeline(
     const parsed = line.parsed;
 
     if (!parsed) {
-      // Unparseable line -- skip
       continue;
     }
 
@@ -43,16 +36,9 @@ export async function buildTimeline(
   return events;
 }
 
-/**
- * Classify a parsed JSONL object into zero or more ReplayEvents.
- * Returns an array so that assistant messages with multiple content blocks
- * (e.g. text + tool_use) emit all events instead of only the first.
- */
 function classifyEvent(parsed: Record<string, unknown>, index: number): ReplayEvent[] {
-  // Runtime type guard: must be a non-null object
   if (typeof parsed !== "object" || parsed === null) return [];
 
-  // Claude API format: role-based messages
   if (parsed.role === "user" || parsed.type === "human") {
     const content = extractContent(parsed);
     if (content) {
@@ -61,7 +47,6 @@ function classifyEvent(parsed: Record<string, unknown>, index: number): ReplayEv
   }
 
   if (parsed.role === "assistant" || parsed.type === "assistant") {
-    // Check for tool_use and text blocks in content array -- emit ALL blocks
     if (Array.isArray(parsed.content)) {
       const events: ReplayEvent[] = [];
       for (const block of parsed.content) {
@@ -93,12 +78,10 @@ function classifyEvent(parsed: Record<string, unknown>, index: number): ReplayEv
     }
   }
 
-  // Tool result messages
   if (parsed.role === "tool" || parsed.type === "tool_result") {
-    return []; // Skip tool results in timeline (they are the consequence of tool_call)
+    return [];
   }
 
-  // Generic fallback: if it has a type field that hints at a category
   if (parsed.type === "tool_use") {
     return [{
       type: "tool_call",

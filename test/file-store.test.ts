@@ -100,14 +100,11 @@ describe("acquireLock", () => {
     const lockPath = join(testDir, "stale.lock");
     const { mkdir: mkdirAsync, utimes } = await import("node:fs/promises");
 
-    // Create a stale lock directory (simulating a lock that was never released)
     await mkdirAsync(lockPath);
 
-    // Manually backdate the mtime to simulate staleness
     const pastTime = new Date(Date.now() - 20_000);
     await utimes(lockPath, pastTime, pastTime);
 
-    // Should succeed because lock is stale (>10s TTL)
     const lock = await acquireLock(lockPath, { ttlMs: 10_000 });
     expect(existsSync(lockPath)).toBe(true);
     await lock.release();
@@ -115,14 +112,12 @@ describe("acquireLock", () => {
 
   test("stale lock file (old format) older than TTL is cleaned up", async () => {
     const lockPath = join(testDir, "stale-file.lock");
-    // Create a stale lock as a regular file (old format compatibility)
     await Bun.write(lockPath, JSON.stringify({ pid: 99999, ts: Date.now() - 20_000 }));
 
     const { utimes } = await import("node:fs/promises");
     const pastTime = new Date(Date.now() - 20_000);
     await utimes(lockPath, pastTime, pastTime);
 
-    // Should succeed because stale file lock is cleaned up
     const lock = await acquireLock(lockPath, { ttlMs: 10_000 });
     expect(existsSync(lockPath)).toBe(true);
     await lock.release();
@@ -132,7 +127,7 @@ describe("acquireLock", () => {
     const lockPath = join(testDir, "idempotent.lock");
     const lock = await acquireLock(lockPath);
     await lock.release();
-    await lock.release(); // Should not throw
+    await lock.release();
   });
 });
 

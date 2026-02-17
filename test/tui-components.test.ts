@@ -1,97 +1,41 @@
 import { test, expect, describe } from "bun:test";
-import React from "react";
-import { render } from "ink-testing-library";
 
-// ─── CouncilPanel ───────────────────────────────────────────────────
-
-describe("CouncilPanel", () => {
-  test("renders loading state", async () => {
-    const { CouncilPanel } = await import("../src/components/CouncilPanel");
-    const { lastFrame } = render(
-      React.createElement(CouncilPanel, { onNavigate: () => {} })
-    );
-    expect(lastFrame()).toContain("Loading");
-  });
-
-  test("exports a callable component (memo-wrapped)", async () => {
-    const mod = await import("../src/components/CouncilPanel");
-    // React.memo wraps the component — typeof may be "object" (memo node) or "function"
-    expect(mod.CouncilPanel).toBeTruthy();
-    expect(typeof mod.CouncilPanel === "function" || typeof mod.CouncilPanel === "object").toBe(true);
+describe("CouncilView", () => {
+  test("exports a callable SolidJS component", async () => {
+    const mod = await import("../src/tui/views/council");
+    expect(mod.CouncilView).toBeTruthy();
+    expect(typeof mod.CouncilView).toBe("function");
   });
 });
-
-// ─── VerificationView ───────────────────────────────────────────────
 
 describe("VerificationView", () => {
-  test("renders loading state", async () => {
-    const { VerificationView } = await import("../src/components/VerificationView");
-    const { lastFrame } = render(
-      React.createElement(VerificationView, { onNavigate: () => {} })
-    );
-    expect(lastFrame()).toContain("Loading");
-  });
-
-  test("exports a callable component (memo-wrapped)", async () => {
-    const mod = await import("../src/components/VerificationView");
+  test("exports a callable SolidJS component", async () => {
+    const mod = await import("../src/tui/views/verification");
     expect(mod.VerificationView).toBeTruthy();
-    expect(typeof mod.VerificationView === "function" || typeof mod.VerificationView === "object").toBe(true);
+    expect(typeof mod.VerificationView).toBe("function");
   });
 });
 
-// ─── EntireSessions ─────────────────────────────────────────────────
-
 describe("EntireSessions", () => {
-  test("renders without crashing", async () => {
-    const { EntireSessions } = await import("../src/components/EntireSessions");
-    const { lastFrame } = render(
-      React.createElement(EntireSessions, { onNavigate: () => {} })
-    );
-    // Should render either loading or the empty state
-    const frame = lastFrame();
-    expect(frame).toBeTruthy();
-  });
-
   test("exports a named function component", async () => {
-    const mod = await import("../src/components/EntireSessions");
+    const mod = await import("../src/tui/views/sessions");
     expect(typeof mod.EntireSessions).toBe("function");
   });
 });
 
-// ─── DelegationChain ────────────────────────────────────────────────
-
 describe("DelegationChain", () => {
-  test("renders without crashing", async () => {
-    const { DelegationChain } = await import("../src/components/DelegationChain");
-    const { lastFrame } = render(
-      React.createElement(DelegationChain, { onNavigate: () => {} })
-    );
-    const frame = lastFrame();
-    expect(frame).toBeTruthy();
-  });
-
-  test("exports a callable component (memo-wrapped)", async () => {
-    const mod = await import("../src/components/DelegationChain");
+  test("exports a callable SolidJS component", async () => {
+    const mod = await import("../src/tui/views/delegation");
     expect(mod.DelegationChain).toBeTruthy();
-    expect(typeof mod.DelegationChain === "function" || typeof mod.DelegationChain === "object").toBe(true);
+    expect(typeof mod.DelegationChain).toBe("function");
   });
 });
 
-// ─── Extended SLABoard ──────────────────────────────────────────────
-
 describe("SLABoard (extended)", () => {
-  test("renders loading state", async () => {
-    const { SLABoard } = await import("../src/components/SLABoard");
-    const { lastFrame } = render(
-      React.createElement(SLABoard, { onNavigate: () => {} })
-    );
-    expect(lastFrame()).toContain("Loading");
-  });
-
   test("has adaptive action labels in source", async () => {
     const { readFileSync } = await import("fs");
     const src = readFileSync(
-      new URL("../src/components/SLABoard.tsx", import.meta.url).pathname,
+      new URL("../src/tui/views/sla.tsx", import.meta.url).pathname,
       "utf-8"
     );
     expect(src).toContain("suggest_reassign");
@@ -101,36 +45,28 @@ describe("SLABoard (extended)", () => {
   });
 });
 
-// ─── Extended TaskBoard ─────────────────────────────────────────────
-
 describe("TaskBoard (extended)", () => {
-  test("renders loading state", async () => {
-    const { TaskBoard } = await import("../src/components/TaskBoard");
-    const { lastFrame } = render(
-      React.createElement(TaskBoard, { onNavigate: () => {}, accounts: [] })
-    );
-    expect(lastFrame()).toContain("Loading");
-  });
-
   test("has friction gate mode in source", async () => {
     const { readFileSync } = await import("fs");
     const src = readFileSync(
-      new URL("../src/components/TaskBoard.tsx", import.meta.url).pathname,
+      new URL("../src/tui/views/tasks.tsx", import.meta.url).pathname,
+      "utf-8"
+    );
+    const partsSrc = readFileSync(
+      new URL("../src/tui/views/task-parts.tsx", import.meta.url).pathname,
       "utf-8"
     );
     expect(src).toContain("justify");
     expect(src).toContain("getGatedAcceptanceAction");
-    expect(src).toContain("calculateProviderFit");
+    expect(partsSrc).toContain("calculateProviderFit");
   });
 });
-
-// ─── Extended WorkflowDetail ────────────────────────────────────────
 
 describe("WorkflowDetail (extended)", () => {
   test("has entire.io evidence section in source", async () => {
     const { readFileSync } = await import("fs");
     const src = readFileSync(
-      new URL("../src/components/WorkflowDetail.tsx", import.meta.url).pathname,
+      new URL("../src/tui/views/workflow-detail.tsx", import.meta.url).pathname,
       "utf-8"
     );
     expect(src).toContain("EntireRetroEvidence");
@@ -139,42 +75,36 @@ describe("WorkflowDetail (extended)", () => {
   });
 });
 
-// ─── App routing ────────────────────────────────────────────────────
-
 describe("App routing", () => {
-  test("NAV_KEYS includes new views", async () => {
-    const { readFileSync } = await import("fs");
-    const src = readFileSync(
-      new URL("../src/app.tsx", import.meta.url).pathname,
-      "utf-8"
-    );
-    expect(src).toContain('c: "council"');
-    expect(src).toContain('v: "verify"');
-    expect(src).toContain('i: "entire"');
-    expect(src).toContain('g: "chains"');
+  test("NAV_KEYS includes all views", async () => {
+    const { NAV_KEYS } = await import("../src/tui/context/keybind");
+    expect(NAV_KEYS["c"]).toBe("council");
+    expect(NAV_KEYS["v"]).toBe("verify");
+    expect(NAV_KEYS["i"]).toBe("entire");
+    expect(NAV_KEYS["g"]).toBe("chains");
   });
 
-  test("app.tsx imports all new components", async () => {
+  test("app.tsx imports all view components", async () => {
     const { readFileSync } = await import("fs");
     const src = readFileSync(
-      new URL("../src/app.tsx", import.meta.url).pathname,
+      new URL("../src/tui/app.tsx", import.meta.url).pathname,
       "utf-8"
     );
-    expect(src).toContain("CouncilPanel");
+    expect(src).toContain("CouncilView");
     expect(src).toContain("VerificationView");
     expect(src).toContain("EntireSessions");
     expect(src).toContain("DelegationChain");
   });
 
-  test("Header includes new nav hints", async () => {
+  test("Header nav items include all new views", async () => {
     const { readFileSync } = await import("fs");
     const src = readFileSync(
-      new URL("../src/components/Header.tsx", import.meta.url).pathname,
+      new URL("../src/tui/ui/header.tsx", import.meta.url).pathname,
       "utf-8"
     );
-    expect(src).toContain("[c]ouncil");
-    expect(src).toContain("[v]erify");
-    expect(src).toContain("[i]entire");
-    expect(src).toContain("[g]chains");
+    expect(src).toContain('"council"');
+    expect(src).toContain('"verify"');
+    expect(src).toContain('"entire"');
+    expect(src).toContain('"chains"');
   });
 });

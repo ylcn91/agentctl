@@ -74,7 +74,7 @@ describe("UsageDetail", () => {
         }
       }
 
-      expect(modelTotals.get("claude-opus-4-6")).toBe(12000); // 4000 + 8000
+      expect(modelTotals.get("claude-opus-4-6")).toBe(12000);
       expect(modelTotals.get("claude-sonnet-4-5-20250929")).toBe(1000);
 
       const totalTokens = Array.from(modelTotals.values()).reduce(

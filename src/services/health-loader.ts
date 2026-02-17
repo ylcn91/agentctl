@@ -5,10 +5,6 @@ import { createLineParser, generateRequestId, frameSend } from "../daemon/framin
 import { getSockPath, getTokensDir } from "../paths.js";
 import type { AccountHealth } from "../daemon/health-monitor.js";
 
-/**
- * Read the first .token file from the tokens directory (async).
- * Returns { account, token } or null if none found.
- */
 async function readFirstToken(
   tokensDir: string,
 ): Promise<{ account: string; token: string } | null> {
@@ -24,10 +20,6 @@ async function readFirstToken(
   }
 }
 
-/**
- * Query the daemon for health status.
- * Falls back to empty if no daemon is running.
- */
 export async function fetchHealthStatus(): Promise<AccountHealth[]> {
   const sockPath = getSockPath();
   if (!existsSync(sockPath)) return [];

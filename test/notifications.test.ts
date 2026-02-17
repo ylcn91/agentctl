@@ -33,7 +33,6 @@ describe("Notifications", () => {
 
     test("disabled config prevents rate limit notification", async () => {
       await notifyRateLimit("claude-work", disabledConfig);
-      // If we get here, it means the function returned early correctly
       expect(true).toBe(true);
     });
 
@@ -58,7 +57,6 @@ describe("Notifications", () => {
           messageReceived: true,
         },
       };
-      // Should skip sending due to rateLimit being false
       await notifyRateLimit("claude-work", config);
       expect(true).toBe(true);
     });
@@ -92,12 +90,8 @@ describe("Notifications", () => {
 
   describe("sendNotification", () => {
     test("returns false on non-darwin platform", async () => {
-      // We test the platform check logic directly
-      // On macOS this will actually try to send, so we test the config gating above
-      // For a pure unit test of the platform check:
       const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
 
-      // Mock process.platform to simulate non-darwin
       Object.defineProperty(process, "platform", {
         value: "linux",
         writable: true,
@@ -107,7 +101,6 @@ describe("Notifications", () => {
       const result = await sendNotification("Test", "Hello");
       expect(result).toBe(false);
 
-      // Restore original
       if (originalPlatform) {
         Object.defineProperty(process, "platform", originalPlatform);
       }
@@ -117,7 +110,7 @@ describe("Notifications", () => {
   describe("notification message formatting", () => {
     test("notifyMessage truncates preview to 80 characters", async () => {
       const config: NotificationConfig = {
-        enabled: false, // disabled so we don't actually send
+        enabled: false,
         events: {
           rateLimit: true,
           handoffReceived: true,
@@ -126,7 +119,6 @@ describe("Notifications", () => {
       };
 
       const longPreview = "a".repeat(200);
-      // This should not throw even with a very long preview
       await notifyMessage("alice", "bob", longPreview, config);
       expect(longPreview.slice(0, 80).length).toBe(80);
     });

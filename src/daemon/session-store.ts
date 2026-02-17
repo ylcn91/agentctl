@@ -69,7 +69,6 @@ export class SessionStore extends BaseStore {
   }
 
   nameSession(sessionId: string, name: string, opts?: { account?: string; tags?: string[]; notes?: string }): Session {
-    // C3: Input length validation
     if (!name || name.length === 0) {
       throw new Error("Session name must not be empty");
     }
@@ -99,7 +98,6 @@ export class SessionStore extends BaseStore {
       return { ...existing, name, tags: opts?.tags ?? existing.tags, notes: opts?.notes ?? existing.notes };
     }
 
-    // M4: Validate account is non-empty when creating a new session
     const account = opts?.account ?? "";
     if (!account) {
       throw new Error("Account is required when creating a new session");

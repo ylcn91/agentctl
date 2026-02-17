@@ -154,10 +154,8 @@ describe("github integration argument construction", () => {
       body: "--web --edit-last",
     });
 
-    // Bun.spawn passes args as array (execve), not through shell
     expect(spawnSpy).toHaveBeenCalled();
     const args = capturedArgs[0];
-    // Dangerous content is passed as a single array element, not shell-interpreted
     expect(args).toContain("Title with $(dangerous) && rm -rf /");
     expect(args).toContain("--web --edit-last");
   });
@@ -228,7 +226,6 @@ describe("integration-hooks onTaskStatusChanged", () => {
 
     try {
       const { onTaskStatusChanged } = await import("../src/services/integration-hooks");
-      // Should not throw even with no links file
       await onTaskStatusChanged("nonexistent-task", "accepted");
     } finally {
       rmSync(TEST_DIR, { recursive: true, force: true });

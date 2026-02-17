@@ -46,7 +46,6 @@ export function scoreAccount(
 ): RoutingScore {
   const reasons: string[] = [];
 
-  // Skill match: 30 points
   let skillPoints: number;
   if (requiredSkills.length === 0) {
     skillPoints = 30;
@@ -61,7 +60,6 @@ export function scoreAccount(
     );
   }
 
-  // Provider fit: 20 points — use provider-profiles for fit calculation
   let providerFitPoints: number;
   if (requiredSkills.length > 0 && capability.providerType) {
     const profile = getProviderProfile(capability.providerType);
@@ -73,7 +71,7 @@ export function scoreAccount(
         `provider fit: ${matchCount}/${requiredSkills.length} strengths (${Math.round(providerFitPoints)}pts)`
       );
     } else if (PROVIDER_STRENGTHS[capability.providerType]) {
-      // Fallback to legacy PROVIDER_STRENGTHS for providers not in profiles
+
       const strengths = PROVIDER_STRENGTHS[capability.providerType];
       const matchingProviderSkills = requiredSkills.filter((s) => strengths.includes(s)).length;
       providerFitPoints = (matchingProviderSkills / requiredSkills.length) * 20;
@@ -89,7 +87,6 @@ export function scoreAccount(
     reasons.push("provider fit: neutral (10pts)");
   }
 
-  // Success rate: 20 points
   let successPoints: number;
   if (capability.totalTasks === 0) {
     successPoints = 10;
@@ -102,7 +99,6 @@ export function scoreAccount(
     reasons.push(`success rate: ${rate}% (${Math.round(successPoints)}pts)`);
   }
 
-  // Speed: 15 points
   let speedPoints: number;
   if (capability.avgDeliveryMs === 0) {
     speedPoints = 8;
@@ -121,7 +117,6 @@ export function scoreAccount(
     reasons.push(`speed: ${Math.round(mins)}min avg (${speedPoints}pts)`);
   }
 
-  // Trust: 10 points
   let trustPoints: number;
   if (capability.trustScore != null) {
     trustPoints = (capability.trustScore / 100) * 10;
@@ -131,7 +126,6 @@ export function scoreAccount(
     reasons.push("trust: neutral (5pts)");
   }
 
-  // Recency: 5 points
   let recencyPoints: number;
   const elapsed = Date.now() - new Date(capability.lastActiveAt).getTime();
   const elapsedMin = elapsed / 60_000;

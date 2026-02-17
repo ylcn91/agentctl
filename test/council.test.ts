@@ -196,7 +196,6 @@ describe("CouncilService.stage2_peerReview", () => {
     const rankings = await service.stage2_peerReview("Build API", analyses);
 
     expect(rankings).toHaveLength(3);
-    // Verify anonymization: prompts should contain "Analysis A", "Analysis B" etc., not account names
     for (const prompt of prompts) {
       expect(prompt).toContain("Analysis A");
       expect(prompt).toContain("Analysis B");
@@ -250,21 +249,13 @@ describe("calculateAggregateRankings", () => {
     const aggregate = calculateAggregateRankings(rankings, accounts);
 
     expect(aggregate).toHaveLength(3);
-    // Rankings are [best-to-worst index arrays]:
-    //   [0, 1, 2] => account-a rank 1, account-b rank 2, account-c rank 3
-    //   [0, 2, 1] => account-a rank 1, account-c rank 2, account-b rank 3
-    //   [2, 0, 1] => account-c rank 1, account-a rank 2, account-b rank 3
-    // account-a: ranks 1, 1, 2 => avg 4/3 = 1.33
     const accountA = aggregate.find((a) => a.account === "account-a");
     expect(accountA?.averageRank).toBe(1.33);
     expect(accountA?.rankCount).toBe(3);
-    // account-b: ranks 2, 3, 3 => avg 8/3 = 2.67
     const accountB = aggregate.find((a) => a.account === "account-b");
     expect(accountB?.averageRank).toBe(2.67);
-    // account-c: ranks 3, 2, 1 => avg 6/3 = 2
     const accountC = aggregate.find((a) => a.account === "account-c");
     expect(accountC?.averageRank).toBe(2);
-    // Sorted by average rank (lower is better)
     expect(aggregate[0].account).toBe("account-a");
     expect(aggregate[2].account).toBe("account-b");
   });
@@ -379,12 +370,10 @@ describe("CouncilService.analyze (full pipeline)", () => {
 
     const result = await service.analyze("Build a REST API", "Using Express.js");
 
-    // Verify all stages ran
     expect(stagesCalled).toContain("stage1");
     expect(stagesCalled).toContain("stage2");
     expect(stagesCalled).toContain("stage3");
 
-    // Verify result structure
     expect(result.taskGoal).toBe("Build a REST API");
     expect(result.timestamp).toBeTruthy();
     expect(result.individualAnalyses).toHaveLength(3);
@@ -435,9 +424,7 @@ describe("CouncilService.analyze (full pipeline)", () => {
 
     const result = await service.analyze("Build a REST API");
 
-    // One account failed, so only 2 analyses
     expect(result.individualAnalyses).toHaveLength(2);
-    // Pipeline still completed
     expect(result.synthesis.chairman).toBe(CHAIRMAN);
   });
 });

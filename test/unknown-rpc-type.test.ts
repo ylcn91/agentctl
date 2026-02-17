@@ -1,10 +1,3 @@
-/**
- * Tests that the daemon handles unknown/invalid message types gracefully.
- *
- * Messages are validated against DaemonMessageSchema before reaching handlers.
- * Unknown or malformed types are rejected at the schema level with an error response.
- * These tests verify that behavior and ensure unknown types never crash the daemon.
- */
 import { describe, test, expect, afterEach } from "bun:test";
 import { join } from "path";
 import { mkdirSync } from "fs";

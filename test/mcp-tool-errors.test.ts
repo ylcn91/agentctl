@@ -1,19 +1,8 @@
-/**
- * MCP tool error path tests for handoff and task tool categories.
- *
- * Complements mcp-error-injection.test.ts which covers messaging, health,
- * workflow, and session categories. This file focuses on:
- * - handoff_task with invalid payloads (validation catches bad inputs)
- * - handoff_task / accept_handoff with daemon errors
- * - update_task_status / report_progress with daemon errors
- * - Connection failure paths for task and handoff tools
- */
 import { describe, test, expect } from "bun:test";
 import { registerHandoffTools } from "../src/mcp/tools/handoff";
 import { registerTaskTools } from "../src/mcp/tools/tasks";
 import type { DaemonSender } from "../src/mcp/tools";
 
-// Minimal McpServer stub that captures registered tool handlers
 type ToolHandler = (args: any) => Promise<any>;
 
 class MockMcpServer {
@@ -30,8 +19,6 @@ class MockMcpServer {
     return handler(args);
   }
 }
-
-// ── Handoff tool error paths ──
 
 describe("handoff_task: invalid payload validation", () => {
   const successSender: DaemonSender = () =>
@@ -162,8 +149,6 @@ describe("handoff tools: connection failure", () => {
     ).rejects.toThrow("ECONNREFUSED");
   });
 });
-
-// ── Task tool error paths ──
 
 describe("task tools: daemon error responses", () => {
   const errorSender: DaemonSender = () =>

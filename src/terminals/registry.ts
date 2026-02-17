@@ -29,7 +29,6 @@ export class TerminalRegistry {
     for (const terminal of candidates) {
       try {
         if (process.platform === "darwin") {
-          // Use Bun.spawn with argument arrays to prevent shell injection
           const mdfindProc = Bun.spawn(
             ["mdfind", `kMDItemCFBundleIdentifier == '${terminal.id}'`],
             { stdout: "pipe", stderr: "ignore" }

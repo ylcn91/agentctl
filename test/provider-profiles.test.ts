@@ -100,9 +100,7 @@ describe("calculateProviderFit", () => {
   });
 
   test("returns correct proportion for partial match", () => {
-    // gemini-cli: python, data-analysis, research, documentation, multimodal
     const fit = calculateProviderFit("gemini-cli", ["python", "data-analysis", "typescript"]);
-    // 2/3 match = 67%
     expect(fit).toBe(67);
   });
 

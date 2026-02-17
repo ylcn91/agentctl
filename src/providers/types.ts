@@ -1,4 +1,3 @@
-// --- Provider-agnostic account reference ---
 
 export interface Account {
   name: string;
@@ -12,8 +11,6 @@ export interface LaunchOpts {
   bypassPermissions?: boolean;
 }
 
-// --- Raw usage data (provider-specific shape, read by UsageSource) ---
-
 export interface RawUsageData {
   totalSessions: number;
   totalMessages: number;
@@ -22,14 +19,10 @@ export interface RawUsageData {
   modelUsage: Record<string, { inputTokens: number; outputTokens: number }>;
 }
 
-// --- Usage source abstraction ---
-
 export interface UsageSource {
   type: "filesystem" | "api" | "process-output";
   read(): Promise<RawUsageData>;
 }
-
-// --- Quota policy abstraction ---
 
 export interface QuotaEstimate {
   percent: number;
@@ -49,8 +42,6 @@ export interface QuotaPolicy {
   estimateRemaining(usage: RawUsageData, opts: QuotaPolicyOpts): QuotaEstimate;
 }
 
-// --- Computed stats for display (derived from RawUsageData) ---
-
 export interface AgentStats {
   totalSessions: number;
   totalMessages: number;
@@ -60,15 +51,11 @@ export interface AgentStats {
   modelUsage: Record<string, { inputTokens: number; outputTokens: number }>;
 }
 
-// --- Process detection ---
-
 export interface ProcessInfo {
   pid: number;
   configDir: string;
   startedAt?: string;
 }
-
-// --- Provider interface ---
 
 export interface AgentProvider {
   id: string;
@@ -76,22 +63,16 @@ export interface AgentProvider {
   icon: string;
   supportsEntire: boolean;
 
-  // Process detection
   detectRunning(account: Account): Promise<ProcessInfo | null>;
 
-  // Lifecycle
   buildLaunchCommand(account: Account, opts: LaunchOpts): string[];
 
-  // Usage - provider decides its own source
   getUsageSource(account: Account): UsageSource;
 
-  // Quota - provider defines its default policy; callers can override
   getQuotaPolicy(overrides?: { plan?: string; estimatedLimit?: number }): QuotaPolicy;
 
-  // Convenience: parse raw usage into display stats (uses getUsageSource internally)
   parseStatsFromFile(statsPath: string, referenceDate?: string): Promise<AgentStats>;
 
-  // Legacy: direct quota estimation (delegates to getQuotaPolicy internally)
   estimateQuota(
     recentMessageCount: number,
     policy: { plan: string; estimatedLimit: number; windowMs: number; source: string }

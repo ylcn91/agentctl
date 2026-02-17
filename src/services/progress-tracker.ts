@@ -28,7 +28,6 @@ export class ProgressTracker {
 
     history.push(report);
 
-    // Sliding window: keep only the most recent MAX_REPORTS_PER_TASK entries
     if (history.length > MAX_REPORTS_PER_TASK) {
       history.splice(0, history.length - MAX_REPORTS_PER_TASK);
     }

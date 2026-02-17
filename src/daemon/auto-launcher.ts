@@ -26,7 +26,7 @@ interface CircuitBreakerState {
 export class AutoLauncher {
   private policy: AutoLaunchPolicy;
   private recentSpawns: SpawnRecord[] = [];
-  private dedupMap = new Map<string, number>(); // target -> last spawn timestamp
+  private dedupMap = new Map<string, number>();
   private circuitBreakers = new Map<string, CircuitBreakerState>();
 
   constructor(policy: AutoLaunchPolicy) {
@@ -34,12 +34,10 @@ export class AutoLauncher {
   }
 
   canLaunch(from: string, target: string): LaunchDecision {
-    // 1. Self-handoff check
     if (this.policy.selfHandoffBlocked && from === target) {
       return { allowed: false, reason: "self-handoff is blocked by policy" };
     }
 
-    // 2. Circuit breaker check
     const cb = this.circuitBreakers.get(target);
     if (cb && cb.failures >= this.policy.circuitBreaker.failureThreshold) {
       if (cb.openedAt) {
@@ -47,12 +45,11 @@ export class AutoLauncher {
         if (elapsed < this.policy.circuitBreaker.cooldownMs) {
           return { allowed: false, reason: `circuit breaker open for ${target} (${Math.round(elapsed / 1000)}s of ${Math.round(this.policy.circuitBreaker.cooldownMs / 1000)}s cooldown)` };
         }
-        // Cooldown expired, reset
+
         this.circuitBreakers.delete(target);
       }
     }
 
-    // 3. Deduplication check
     const lastSpawn = this.dedupMap.get(target);
     if (lastSpawn !== undefined) {
       const elapsed = Date.now() - lastSpawn;
@@ -61,7 +58,6 @@ export class AutoLauncher {
       }
     }
 
-    // 4. Rate limit check
     const now = Date.now();
     const windowMs = 60_000;
     this.recentSpawns = this.recentSpawns.filter((s) => now - s.timestamp < windowMs);
@@ -76,7 +72,7 @@ export class AutoLauncher {
     const now = Date.now();
     this.recentSpawns.push({ target, timestamp: now });
     this.dedupMap.set(target, now);
-    // Success resets circuit breaker failures
+
     this.circuitBreakers.delete(target);
   }
 
@@ -89,7 +85,6 @@ export class AutoLauncher {
     this.circuitBreakers.set(target, cb);
   }
 
-  // Test helpers -- allow expiring windows without waiting real time
   expireRateLimitForTest(): void {
     this.recentSpawns = [];
   }
